@@ -155,17 +155,46 @@ export default function StairsCalculator() {
     setTreadOverride(null);
   };
 
-  // ---- Checks: only what needs attention ----
+  // ---- Checks: only what needs attention, each with a way to fix it ----
   const issues = [];
   if (stair) {
-    if (!stair.fits) issues.push(`${fmtM(stair.overBy)} m longer than the available run.`);
-    if (!stair.treadOk) issues.push(`Tread is below the ${fmtCm(rules.minTread)} cm minimum.`);
-    if (!stair.comfortOk)
-      issues.push(`2 × riser + tread = ${fmtCm(stair.comfort)} cm. Comfortable is ${rules.comfortMin}–${rules.comfortMax} (tread ${fmtCm(range.min)}–${fmtCm(range.max)}).`);
-    if (heightCm != null && stair.heightDiff !== 0)
-      issues.push(
-        `Builds ${fmtCm(Math.abs(stair.heightDiff))} cm ${stair.heightDiff > 0 ? "above" : "below"} the target height. Absorb it in grading or round finer.`
-      );
+    const tuned = treadOverride?.key === base.key;
+    const resetTread = { label: `Reset tread to ${fmtCm(base.tread)} cm`, apply: () => setTreadOverride(null) };
+    const stepsLabel = (o) => (heightCm == null ? `Use a ${fmtCm(o.riser)} cm riser` : `Use ${o.steps} steps`);
+
+    if (!stair.fits) {
+      const actions = [];
+      if (tuned && base.fits) actions.push(resetTread);
+      const fitting = bestOption(options.filter((o) => o.fits && o.key !== base.key));
+      if (fitting) actions.push({ label: stepsLabel(fitting), apply: () => select(fitting) });
+      const needed = parseFloat((Math.ceil(stair.run) / 100).toFixed(2));
+      actions.push({ label: `Set available run to ${needed} m`, apply: () => setDistance(String(needed)) });
+      issues.push({ text: `The stair is ${fmtM(stair.overBy)} m longer than the available run.`, actions });
+    }
+    if (!stair.treadOk) {
+      issues.push({
+        text: `Tread ${fmtCm(stair.tread)} cm is below the ${fmtCm(rules.minTread)} cm minimum.`,
+        actions: [{ label: `Set tread to ${fmtCm(range.min)} cm`, apply: () => setTreadOverride({ key: base.key, tread: range.min }) }],
+      });
+    } else if (!stair.comfortOk) {
+      issues.push({
+        text: `Less comfortable to walk: 2 × riser + tread is ${fmtCm(stair.comfort)} cm, and should be ${rules.comfortMin}–${rules.comfortMax}. For this riser that means a tread of ${fmtCm(range.min)}–${fmtCm(range.max)} cm.`,
+        actions: tuned && base.comfortOk ? [resetTread] : [],
+      });
+    }
+    if (heightCm != null && stair.heightDiff !== 0) {
+      const diff = `${fmtCm(Math.abs(stair.heightDiff))} cm ${stair.heightDiff > 0 ? "higher" : "lower"}`;
+      const actions = [];
+      const exact = bestOption(options.filter((o) => o.heightDiff === 0 && o.fits));
+      if (exact) actions.push({ label: `${stepsLabel(exact)} (exact)`, apply: () => select(exact) });
+      const finer = ROUNDING.find((r) => r.value < rules.roundTo);
+      if (finer) actions.push({ label: `Round to ${finer.label}`, apply: () => setRule("roundTo", finer.value) });
+      actions.push({ label: `Change height to ${fmtM(stair.rise)} m`, apply: () => setHeight(String(parseFloat((stair.rise / 100).toFixed(3)))) });
+      issues.push({
+        text: `${stair.steps} × ${fmtCm(stair.riser)} cm = ${fmtM(stair.rise)} m, which is ${diff} than your ${fmtM(heightCm)} m. Pick a fix, or keep it and make up the difference in the paving levels.`,
+        actions,
+      });
+    }
   }
 
   const index = base ? options.findIndex((o) => o.key === base.key) : -1;
@@ -340,11 +369,26 @@ export default function StairsCalculator() {
                 <Check className="w-5 h-5" /> Comfortable and within the rules
               </div>
             ) : (
-              <ul className="bg-yellow-200 border-4 border-black shadow-[4px_4px_0px_#000] p-3 grid gap-2 text-sm font-bold text-black">
-                {issues.map((text) => (
-                  <li key={text} className="flex items-start gap-2">
+              <ul className="bg-yellow-200 border-4 border-black shadow-[4px_4px_0px_#000] p-3 grid gap-3 text-sm font-bold text-black">
+                {issues.map((issue) => (
+                  <li key={issue.text} className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span>{text}</span>
+                    <div>
+                      <p>{issue.text}</p>
+                      {issue.actions.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {issue.actions.map((action) => (
+                            <button
+                              key={action.label}
+                              onClick={action.apply}
+                              className="bg-white hover:bg-lime-100 border-2 border-black px-2 py-1 text-xs font-black uppercase shadow-[2px_2px_0px_#000]"
+                            >
+                              {action.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

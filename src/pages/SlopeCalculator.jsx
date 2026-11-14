@@ -380,33 +380,33 @@ export default function SlopeCalculator() {
                     transition={{ duration: 0.3 }}
                   >
                     <Tabs defaultValue="option1" className="w-full">
-                      <TabsList className="bg-lime-200 text-muted-foreground p-0 h-10 pt-1 items-center rounded-md w-full gap-0 md:gap-0 flex justify-between border-black rounded-t-lg">
-                        <TabsTrigger
+                      <TabsList className="relative z-10 flex items-stretch w-full h-auto p-0 gap-0 bg-transparent rounded-none">
+<TabsTrigger
                           value="option1"
-                          className="flex-1 data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-0 bg-lime-400 hover:bg-lime-300 text-black px-1 md:px-2 py-2 md:py-3 text-sm md:text-lg uppercase border-4 border-black rounded-t-lg flex items-center justify-center gap-1"
+                          className="flex-1 min-w-0 -ml-1 first:ml-0 h-auto rounded-none first:rounded-tl-lg last:rounded-tr-lg border-4 border-black bg-lime-400 hover:bg-lime-300 text-black font-bold uppercase px-1 md:px-3 py-2 md:py-3 text-[11px] leading-tight md:text-base whitespace-normal flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-none data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-lime-200 data-[state=active]:shadow-none"
                         >
-                          <Calculator className="w-4 h-4 md:w-5 md:h-5" />
-                          <span className="hidden md:inline">Slope & Height</span>
+                          <Calculator className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+                          <span>Slope & Height</span>
                         </TabsTrigger>
                         <TabsTrigger
                           value="option2"
-                          className="flex-1 data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-0 bg-lime-400 hover:bg-lime-300 text-black px-1 md:px-2 py-2 md:py-3 text-sm md:text-lg uppercase border-4 border-black rounded-t-lg flex items-center justify-center gap-1"
+                          className="flex-1 min-w-0 -ml-1 first:ml-0 h-auto rounded-none first:rounded-tl-lg last:rounded-tr-lg border-4 border-black bg-lime-400 hover:bg-lime-300 text-black font-bold uppercase px-1 md:px-3 py-2 md:py-3 text-[11px] leading-tight md:text-base whitespace-normal flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-none data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-lime-200 data-[state=active]:shadow-none"
                         >
                           <Ruler className="w-4 h-4 md:w-5 md:h-5" />
-                          <span className="hidden md:inline">Distance & Height</span>
+                          <span>Distance & Height</span>
                         </TabsTrigger>
                         <TabsTrigger
                           value="option3"
-                          className="flex-1 data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-0 bg-lime-400 hover:bg-lime-300 text-black px-1 md:px-2 py-2 md:py-3 text-sm md:text-lg uppercase border-4 border-black rounded-t-lg flex items-center justify-center gap-1"
+                          className="flex-1 min-w-0 -ml-1 first:ml-0 h-auto rounded-none first:rounded-tl-lg last:rounded-tr-lg border-4 border-black bg-lime-400 hover:bg-lime-300 text-black font-bold uppercase px-1 md:px-3 py-2 md:py-3 text-[11px] leading-tight md:text-base whitespace-normal flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-none data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-lime-200 data-[state=active]:shadow-none"
                         >
                           <LineChart className="w-4 h-4 md:w-5 md:h-5" />
-                          <span className="hidden md:inline">Distance & Slope</span>
+                          <span>Distance & Slope</span>
                         </TabsTrigger>
                       </TabsList>
 
                       {/* Option 1: Calculate distance from slope and height */}
                       <TabsContent value="option1" className="mt-0">
-                        <Card className="border-4 border-t-0 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6"> 
+                        <Card className="-mt-1 border-4 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6"> 
                           <h2 className="text-xl md:text-2xl font-black text-lime-900 mb-4 md:mb-6 uppercase tracking-tight">
                             Find Distance
                           </h2>
@@ -481,7 +481,7 @@ export default function SlopeCalculator() {
 
                       {/* Option 2: Calculate slope from distance and height */}
                       <TabsContent value="option2" className="mt-0">
-                        <Card className="border-4 border-t-0 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
+                        <Card className="-mt-1 border-4 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
                           <h2 className="text-xl md:text-2xl font-black text-lime-900 mb-4 md:mb-6 uppercase tracking-tight">
                             Find Slope
                           </h2>
@@ -556,7 +556,7 @@ export default function SlopeCalculator() {
 
                       {/* Option 3: Calculate height from distance and slope */}
                       <TabsContent value="option3" className="mt-0">
-                        <Card className="border-4 border-t-0 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
+                        <Card className="-mt-1 border-4 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
                           <h2 className="text-xl md:text-2xl font-black text-lime-900 mb-4 md:mb-6 uppercase tracking-tight">
                             Find Height
                           </h2>
@@ -639,32 +639,32 @@ export default function SlopeCalculator() {
                     exit={{ opacity: 0, x: 50 }}
                     transition={{ duration: 0.3 }}>
                     <Tabs defaultValue="option1" className="w-full">
-                      <TabsList className="p-0 bg-lime-200 text-muted-foreground mx-auto pt-1 h-10 items-center rounded-md w-full gap-1 md:gap-0 flex justify-between border-0 border-b-0 border-black rounded-t-lg"> 
-                        <TabsTrigger
+                      <TabsList className="relative z-10 flex items-stretch w-full h-auto p-0 gap-0 bg-transparent rounded-none">
+<TabsTrigger
                           value="option1"
-                          className="flex-1 data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-0 bg-lime-400 hover:bg-lime-300 text-black px-1 md:px-2 py-2 md:py-3 text-sm md:text-lg uppercase border-4 border-black rounded-t-lg flex items-center justify-center gap-1"
+                          className="flex-1 min-w-0 -ml-1 first:ml-0 h-auto rounded-none first:rounded-tl-lg last:rounded-tr-lg border-4 border-black bg-lime-400 hover:bg-lime-300 text-black font-bold uppercase px-1 md:px-3 py-2 md:py-3 text-[11px] leading-tight md:text-base whitespace-normal flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-none data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-lime-200 data-[state=active]:shadow-none"
                         >
-                          <Calculator className="w-4 h-4 md:w-5 md:h-5" />
-                          <span className="hidden md:inline">Find Slope</span>
+                          <Calculator className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+                          <span>Find Slope</span>
                         </TabsTrigger>
                         <TabsTrigger
                           value="option2"
-                          className="flex-1 data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-0 bg-lime-400 hover:bg-lime-300 text-black px-1 md:px-2 py-2 md:py-3 text-sm md:text-lg uppercase border-4 border-black rounded-t-lg flex items-center justify-center gap-1"
+                          className="flex-1 min-w-0 -ml-1 first:ml-0 h-auto rounded-none first:rounded-tl-lg last:rounded-tr-lg border-4 border-black bg-lime-400 hover:bg-lime-300 text-black font-bold uppercase px-1 md:px-3 py-2 md:py-3 text-[11px] leading-tight md:text-base whitespace-normal flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-none data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-lime-200 data-[state=active]:shadow-none"
                         >
                           <MapPin className="w-4 h-4 md:w-5 md:h-5" />
-                          <span className="hidden md:inline">Find 2nd Point</span>
+                          <span>Find 2nd Point</span>
                         </TabsTrigger>
                         <TabsTrigger
                           value="option3"
-                          className="flex-1 data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-0 bg-lime-400 hover:bg-lime-300 text-black px-1 md:px-2 py-2 md:py-3 text-sm md:text-lg uppercase border-4 border-black rounded-t-lg flex items-center justify-center gap-1"
+                          className="flex-1 min-w-0 -ml-1 first:ml-0 h-auto rounded-none first:rounded-tl-lg last:rounded-tr-lg border-4 border-black bg-lime-400 hover:bg-lime-300 text-black font-bold uppercase px-1 md:px-3 py-2 md:py-3 text-[11px] leading-tight md:text-base whitespace-normal flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 shadow-none data-[state=active]:bg-lime-200 data-[state=active]:text-lime-900 data-[state=active]:border-b-lime-200 data-[state=active]:shadow-none"
                         >
                           <Ruler className="w-4 h-4 md:w-5 md:h-5" />
-                          <span className="hidden md:inline">Find Distance</span>
+                          <span>Find Distance</span>
                         </TabsTrigger>
                       </TabsList>
                       
                       <TabsContent value="option1" className="mt-0">
-                        <Card className="border-4 border-t-0 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
+                        <Card className="-mt-1 border-4 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
                           <h2 className="text-xl md:text-2xl font-black text-lime-900 mb-4 md:mb-6 uppercase tracking-tight">
                             Find Slope Between Points
                           </h2>
@@ -763,7 +763,7 @@ export default function SlopeCalculator() {
                       </TabsContent>
 
                       <TabsContent value="option2" className="mt-0">
-                        <Card className="border-4 border-t-0 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
+                        <Card className="-mt-1 border-4 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
                           <h2 className="text-xl md:text-2xl font-black text-lime-900 mb-4 md:mb-6 uppercase tracking-tight">Find Second Point Elevation</h2>
                           <div className="grid gap-4 md:gap-6">
                             <div>
@@ -849,7 +849,7 @@ export default function SlopeCalculator() {
                       </TabsContent>
 
                       <TabsContent value="option3" className="mt-0">
-                        <Card className="border-4 border-t-0 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
+                        <Card className="-mt-1 border-4 rounded-t-none border-black shadow-[8px_8px_0px_#000] bg-lime-200 p-4 md:p-6">
                           <h2 className="text-xl md:text-2xl font-black text-lime-900 mb-4 md:mb-6 uppercase tracking-tight">Find Distance from Points & Slope</h2>
                           <div className="grid gap-4 md:gap-6">
                             <div>
