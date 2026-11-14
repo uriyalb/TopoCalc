@@ -18,7 +18,7 @@ VITE_BASE44_APP_BASE_URL=your_backend_url
 
 ## CI & deployment
 
-`.github/workflows/deploy.yml` lints and builds on pull requests, and on every push to `master` it builds and deploys to **GitHub Pages** (also runnable manually from the Actions tab).
+`.github/workflows/deploy.yml` lints and builds on pull requests, and on every push to `main` it builds and deploys to **GitHub Pages** (also runnable manually from the Actions tab).
 
 The Pages build is a standalone static site:
 

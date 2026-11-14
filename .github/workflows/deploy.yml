@@ -2,7 +2,7 @@ name: CI & Deploy to GitHub Pages
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -42,13 +42,13 @@ jobs:
         run: cp dist/index.html dist/404.html
 
       - uses: actions/upload-pages-artifact@v3
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:
           path: dist
 
   deploy:
-    # Deploy only from master
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    # Deploy only from main
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:
