@@ -3,6 +3,10 @@ declare module '@/lib/utils' {
   export function cn(...inputs: unknown[]): string;
 }
 
+declare module '@/components/BetaTag' {
+  export function BetaTag(props: { className?: string }): JSX.Element;
+}
+
 // pdf.js 3.x ships no types for its prebuilt bundle.
 declare module 'pdfjs-dist/build/pdf' {
   interface PdfJs {

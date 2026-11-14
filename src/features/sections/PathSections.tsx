@@ -29,7 +29,7 @@ interface ModeConfig {
 
 const initialConfig: ModeConfig = { path: '', contours: [], data: [] };
 
-const PathSections: React.FC = () => {
+const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
     // Application State
     const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
     const [fileName, setFileName] = useState<string>('');
@@ -273,7 +273,7 @@ const PathSections: React.FC = () => {
     const hasProfile = profileConfig.data.length > 0;
 
     return (
-        <ToolCard title="Path Sections" aside={<Hint>DXF path + contours → long &amp; cross sections</Hint>}>
+        <ToolCard title="Path Sections" beta={beta} aside={<Hint>DXF path + contours → long &amp; cross sections</Hint>}>
             <div className="grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
 
                 {/* 1. Setup */}

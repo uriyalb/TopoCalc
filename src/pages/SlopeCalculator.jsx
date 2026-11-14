@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import TopographyBackground from "../components/TopographyBackground";
 import ResultCard from "../components/ResultCard";
 import StairsCalculator from "../components/StairsCalculator";
+import { BetaTag } from "../components/BetaTag";
 import { Calculator, Ruler, LineChart, ArrowBigUp, MoveUp, MapPin, Menu, X, Route, Shovel } from "lucide-react";
 
 // Loaded on first use: they bring the DXF parser, the charts and the PDF reader with them.
@@ -17,12 +18,13 @@ const CutFill = lazy(() => import("@/features/cutfill/CutFill"));
 
 // One list drives the folder tabs, the mobile menu and the "you are here" badge.
 // `workspace` tools are drawing boards: they get the full width and keep their state while hidden.
+// `beta` puts a Beta tag on the tab and a banner in the tool — delete the flag when a tool is proven.
 const TOOLS = [
   { id: "slope", label: "Slope", name: "Slope Calculator", icon: Calculator },
   { id: "elevation", label: "Elevation", name: "Elevation Calculator", icon: MapPin },
   { id: "stairs", label: "Stairs", name: "Stairs Calculator", icon: MoveUp },
-  { id: "sections", label: "Sections", name: "Path Sections", icon: Route, workspace: PathSections },
-  { id: "cut-fill", label: "Cut & Fill", name: "Cut & Fill", icon: Shovel, workspace: CutFill },
+  { id: "sections", label: "Sections", name: "Path Sections", icon: Route, workspace: PathSections, beta: true },
+  { id: "cut-fill", label: "Cut & Fill", name: "Cut & Fill", icon: Shovel, workspace: CutFill, beta: true },
 ];
 const WORKSPACES = TOOLS.filter((t) => t.workspace);
 const isWorkspace = (id) => WORKSPACES.some((t) => t.id === id);
@@ -332,6 +334,7 @@ export default function SlopeCalculator() {
                   >
                     <tool.icon className="w-6 h-6" />
                     {tool.name}
+                    {tool.beta && <BetaTag className="ml-auto" />}
                   </button>
                 ))}
               </div>
@@ -366,6 +369,7 @@ export default function SlopeCalculator() {
                 >
                   <tool.icon className="w-5 h-5" />
                   {tool.label}
+                  {tool.beta && <BetaTag />}
                 </button>
               ))}
               <div className="flex-1 border-black relative z-10"></div>
@@ -376,6 +380,7 @@ export default function SlopeCalculator() {
               <div className="inline-flex items-center gap-2 bg-lime-300 px-4 py-2 border-4 border-black rounded-lg shadow-[4px_4px_0px_#000]">
                 <activeTool.icon className="w-5 h-5" />
                 <span className="font-bold text-black uppercase">{activeTool.label}</span>
+                {activeTool.beta && <BetaTag />}
               </div>
             </div>
 
@@ -947,7 +952,7 @@ export default function SlopeCalculator() {
               {WORKSPACES.filter((tool) => visited.includes(tool.id)).map((tool) => (
                 <div key={tool.id} className={activeFolder === tool.id && !leaving ? "" : "hidden"}>
                   <Suspense fallback={<ToolLoading />}>
-                    <tool.workspace />
+                    <tool.workspace beta={tool.beta} />
                   </Suspense>
                 </div>
               ))}

@@ -46,7 +46,7 @@ function SectionTitle({ children, aside }: { children: React.ReactNode; aside?: 
   );
 }
 
-export default function CutFill() {
+export default function CutFill({ beta }: { beta?: boolean }) {
   // --- State ---
   // Core Data
   const [gridSize, setGridSize] = useState<GridSize>({ rows: 3, cols: 4 });
@@ -597,6 +597,7 @@ export default function CutFill() {
   return (
     <ToolCard
       title="Cut & Fill"
+      beta={beta}
       aside={
         <div className="flex flex-wrap items-center gap-3">
           {currentProject && <span className="border-2 border-black bg-white px-2 py-0.5 text-xs font-black uppercase text-black">{currentProject.name}</span>}

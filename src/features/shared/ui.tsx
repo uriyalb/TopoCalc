@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BetaTag } from '@/components/BetaTag';
 
 // The TopoCalc look, in one place: black 4px outlines, hard offset shadows,
 // lime surfaces, loud uppercase labels. Same vocabulary as the Stairs builder.
@@ -13,16 +14,27 @@ export const inputClass =
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 
 /** The outer card of a tool — sits right under the folder tabs. */
-export function ToolCard({ title, aside, children, className }: { title: string; aside?: React.ReactNode; children: React.ReactNode; className?: string }) {
+export function ToolCard({ title, aside, beta, children, className }: { title: string; aside?: React.ReactNode; beta?: boolean; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn('rounded-xl border-4 border-black bg-lime-200 p-4 md:p-6 shadow-[8px_8px_0px_#000]', className)}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="text-xl md:text-2xl font-black text-lime-900 uppercase tracking-tight">{title}</h2>
         {aside}
       </div>
+      {beta && <BetaBanner />}
       {/* These are drawing boards: pan, zoom and drag need a mouse and some room */}
       <Hint className="mb-3 lg:hidden">Made for a mouse · best on a larger screen</Hint>
       {children}
+    </div>
+  );
+}
+
+/** Shown at the top of a tool that is still being tested. Same yellow as the warnings in Stairs. */
+function BetaBanner() {
+  return (
+    <div role="note" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-4 border-black bg-yellow-200 px-3 py-2 shadow-[4px_4px_0px_#000]">
+      <BetaTag className="px-2 py-1 text-xs" />
+      <span className="text-sm font-bold text-black">New and still being tested — check the results before you rely on them.</span>
     </div>
   );
 }
