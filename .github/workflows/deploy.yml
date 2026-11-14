@@ -57,6 +57,10 @@ jobs:
           cache: npm
           cache-dependency-path: '*/package-lock.json'
 
+      # base_path is "/<repo>" on github.io and "" once a custom domain is set
+      - id: pages
+        uses: actions/configure-pages@v5
+
       - name: Build main
         working-directory: main
         run: |
@@ -64,7 +68,7 @@ jobs:
           npm run lint
           npm run build
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}/
 
       - name: Build stage
         if: steps.stage.outputs.exists == 'true'
@@ -74,7 +78,7 @@ jobs:
           npm run lint
           npm run build
         env:
-          BASE_PATH: /${{ github.event.repository.name }}/stage/
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}/stage/
           VITE_STAGE: 'true'
 
       - name: Assemble site
