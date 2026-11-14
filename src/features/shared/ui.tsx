@@ -20,6 +20,8 @@ export function ToolCard({ title, aside, children, className }: { title: string;
         <h2 className="text-xl md:text-2xl font-black text-lime-900 uppercase tracking-tight">{title}</h2>
         {aside}
       </div>
+      {/* These are drawing boards: pan, zoom and drag need a mouse and some room */}
+      <Hint className="mb-3 lg:hidden">Made for a mouse · best on a larger screen</Hint>
       {children}
     </div>
   );
@@ -162,7 +164,7 @@ export function Stat({ label, value, unit, sub, swatch, tone = 'white', classNam
         {value}
         {unit && <span className="ml-1 text-sm font-bold">{unit}</span>}
       </div>
-      {sub != null && <div className={cn('truncate text-xs font-bold', dark ? 'text-lime-300' : 'text-lime-700')}>{sub}</div>}
+      {sub != null && <div className={cn('text-xs font-bold leading-tight', dark ? 'text-lime-300' : 'text-lime-700')}>{sub}</div>}
     </div>
   );
 }
