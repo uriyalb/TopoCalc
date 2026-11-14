@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,11 +9,60 @@ import { motion, AnimatePresence } from "framer-motion";
 import TopographyBackground from "../components/TopographyBackground";
 import ResultCard from "../components/ResultCard";
 import StairsCalculator from "../components/StairsCalculator";
-import { Calculator, Ruler, LineChart, ArrowBigUp, MoveUp, MapPin, Menu, X } from "lucide-react";
+import { Calculator, Ruler, LineChart, ArrowBigUp, MoveUp, MapPin, Menu, X, Route, Shovel } from "lucide-react";
+
+// Loaded on first use: they bring the DXF parser, the charts and the PDF reader with them.
+const PathSections = lazy(() => import("@/features/sections/PathSections"));
+const CutFill = lazy(() => import("@/features/cutfill/CutFill"));
+
+// One list drives the folder tabs, the mobile menu and the "you are here" badge.
+// `workspace` tools are drawing boards: they get the full width and keep their state while hidden.
+const TOOLS = [
+  { id: "slope", label: "Slope", name: "Slope Calculator", icon: Calculator },
+  { id: "elevation", label: "Elevation", name: "Elevation Calculator", icon: MapPin },
+  { id: "stairs", label: "Stairs", name: "Stairs Calculator", icon: MoveUp },
+  { id: "sections", label: "Sections", name: "Path Sections", icon: Route, workspace: PathSections },
+  { id: "cut-fill", label: "Cut & Fill", name: "Cut & Fill", icon: Shovel, workspace: CutFill },
+];
+const WORKSPACES = TOOLS.filter((t) => t.workspace);
+const isWorkspace = (id) => WORKSPACES.some((t) => t.id === id);
+
+function ToolLoading() {
+  return (
+    <div className="rounded-xl border-4 border-black bg-lime-200 p-10 shadow-[8px_8px_0px_#000] flex justify-center">
+      <div className="w-8 h-8 border-4 border-lime-400 border-t-black rounded-full animate-spin"></div>
+    </div>
+  );
+}
 
 export default function SlopeCalculator() {
-  const [activeFolder, setActiveFolder] = useState("slope"); // 'slope', 'stairs', or 'elevation'
+  // The open tool lives in the URL (?tool=…) so it survives a refresh and can be linked to.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get("tool");
+  const activeFolder = TOOLS.some((t) => t.id === requested) ? requested : "slope";
+  const setActiveFolder = (id) => setSearchParams(id === "slope" ? {} : { tool: id });
+  const activeTool = TOOLS.find((t) => t.id === activeFolder);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Workspace tools mount on first visit and then stay mounted, so unsaved work survives a tab switch.
+  const [visited, setVisited] = useState(() => (isWorkspace(activeFolder) ? [activeFolder] : []));
+  useEffect(() => {
+    if (isWorkspace(activeFolder)) setVisited((v) => (v.includes(activeFolder) ? v : [...v, activeFolder]));
+  }, [activeFolder]);
+
+  // A calculator animates out before a workspace takes its place.
+  const previousTool = useRef(activeFolder);
+  const [leaving, setLeaving] = useState(false);
+  useLayoutEffect(() => {
+    if (previousTool.current === activeFolder) return;
+    const fromCalculator = !isWorkspace(previousTool.current);
+    previousTool.current = activeFolder;
+    if (!fromCalculator) return;
+    setLeaving(true);
+    const fallback = setTimeout(() => setLeaving(false), 450);
+    return () => clearTimeout(fallback);
+  }, [activeFolder]);
+  const wide = isWorkspace(activeFolder) && !leaving;
   
   // State for the slope calculator tabs
   const [slopeHeightToDistance, setSlopeHeightToDistance] = useState({
@@ -266,45 +316,24 @@ export default function SlopeCalculator() {
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-xl font-black text-lime-900 mb-6 uppercase mt-16">
-                Calculators
+                Tools
               </h2>
               <div className="space-y-4">
-                <button
-                  onClick={() => {
-                    setActiveFolder("slope");
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full p-4 font-bold text-black border-4 border-black rounded-lg shadow-[4px_4px_0px_#000] uppercase flex items-center gap-3 ${
-                    activeFolder === "slope" ? "bg-lime-500" : "bg-lime-400 hover:bg-lime-300"
-                  }`}
-                >
-                  <Calculator className="w-6 h-6" />
-                  Slope Calculator
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveFolder("elevation");
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full p-4 font-bold text-black border-4 border-black rounded-lg shadow-[4px_4px_0px_#000] uppercase flex items-center gap-3 ${
-                    activeFolder === "elevation" ? "bg-lime-500" : "bg-lime-400 hover:bg-lime-300"
-                  }`}
-                >
-                  <MapPin className="w-6 h-6" />
-                  Elevation Calculator
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveFolder("stairs");
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full p-4 font-bold text-black border-4 border-black rounded-lg shadow-[4px_4px_0px_#000] uppercase flex items-center gap-3 ${
-                    activeFolder === "stairs" ? "bg-lime-500" : "bg-lime-400 hover:bg-lime-300"
-                  }`}
-                >
-                  <MoveUp className="w-6 h-6" />
-                  Stairs Calculator
-                </button>
+                {TOOLS.map((tool) => (
+                  <button
+                    key={tool.id}
+                    onClick={() => {
+                      setActiveFolder(tool.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full p-4 font-bold text-black border-4 border-black rounded-lg shadow-[4px_4px_0px_#000] uppercase flex items-center gap-3 ${
+                      activeFolder === tool.id ? "bg-lime-500" : "bg-lime-400 hover:bg-lime-300"
+                    }`}
+                  >
+                    <tool.icon className="w-6 h-6" />
+                    {tool.name}
+                  </button>
+                ))}
               </div>
             </motion.div>
           </motion.div>
@@ -312,7 +341,7 @@ export default function SlopeCalculator() {
       </AnimatePresence>
 
       <div className="p-4 md:p-8 relative z-10">
-        <div className="max-w-4xl mx-auto">
+        <div className={`${wide ? "max-w-[1600px]" : "max-w-4xl"} mx-auto`}>
           <div className="text-center md:text-left mt-16 md:mt-0">
             <h1 className="text-3xl md:text-6xl font-black text-lime-800 mb-2 tracking-tight leading-none">
               TOPO CALCULATOR
@@ -325,52 +354,33 @@ export default function SlopeCalculator() {
           <div className="relative">
             {/* Desktop Folder tabs */}
             <div className="mb-2 hidden md:flex gap-1 md:gap-2">
-              <button
-                onClick={() => setActiveFolder("slope")}
-                className={`${
-                  activeFolder === "slope" ? "bg-lime-200 relative z-20" : "bg-lime-400 hover:bg-lime-300"
-                } py-3 px-6 font-bold text-black border-4 border-b-0 border-black rounded-t-lg shadow-[4px_0px_0px_#000] uppercase flex items-center gap-2`}
-              >
-                <Calculator className="w-5 h-5" />
-                Slope
-              </button>
-              <button
-                onClick={() => setActiveFolder("elevation")}
-                className={`${
-                  activeFolder === "elevation" ? "bg-lime-200 relative z-20" : "bg-lime-400 hover:bg-lime-300"
-                } py-3 px-6 font-bold text-black border-4 border-b-0 border-l-0 border-black rounded-t-lg shadow-[4px_0px_0px_#000] uppercase flex items-center gap-2 ml-[-4px]`}
-              >
-                <MapPin className="w-5 h-5" />
-                Elevation
-              </button>
-              <button
-                onClick={() => setActiveFolder("stairs")}
-                className={`${
-                  activeFolder === "stairs" ? "bg-lime-200 relative z-20" : "bg-lime-400 hover:bg-lime-300"
-                } py-3 px-6 font-bold text-black border-4 border-b-0 border-l-0 border-black rounded-t-lg shadow-[4px_0px_0px_#000] uppercase flex items-center gap-2 ml-[-4px]`}
-              >
-                <MoveUp className="w-5 h-5" />
-                Stairs
-              </button>
+              {TOOLS.map((tool, i) => (
+                <button
+                  key={tool.id}
+                  onClick={() => setActiveFolder(tool.id)}
+                  className={`${
+                    activeFolder === tool.id ? "bg-lime-200 relative z-20" : "bg-lime-400 hover:bg-lime-300"
+                  } py-3 px-3 lg:px-6 text-sm lg:text-base whitespace-nowrap font-bold text-black border-4 border-b-0 ${
+                    i > 0 ? "border-l-0 ml-[-4px]" : ""
+                  } border-black rounded-t-lg shadow-[4px_0px_0px_#000] uppercase flex items-center gap-2`}
+                >
+                  <tool.icon className="w-5 h-5" />
+                  {tool.label}
+                </button>
+              ))}
               <div className="flex-1 border-black relative z-10"></div>
             </div>
 
             {/* Mobile Current Calculator Indicator */}
             <div className="md:hidden mb-4 text-center">
               <div className="inline-flex items-center gap-2 bg-lime-300 px-4 py-2 border-4 border-black rounded-lg shadow-[4px_4px_0px_#000]">
-                {activeFolder === "slope" && <Calculator className="w-5 h-5" />}
-                {activeFolder === "elevation" && <MapPin className="w-5 h-5" />}
-                {activeFolder === "stairs" && <MoveUp className="w-5 h-5" />}
-                <span className="font-bold text-black uppercase">
-                  {activeFolder === "slope" && "Slope"}
-                  {activeFolder === "elevation" && "Elevation"}
-                  {activeFolder === "stairs" && "Stairs"}
-                </span>
+                <activeTool.icon className="w-5 h-5" />
+                <span className="font-bold text-black uppercase">{activeTool.label}</span>
               </div>
             </div>
 
             <div className="relative">
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait" onExitComplete={() => setLeaving(false)}>
                 {activeFolder === "slope" && (
                   <motion.div
                     key="slope"
@@ -932,6 +942,15 @@ export default function SlopeCalculator() {
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Workspace tools: mounted once visited, hidden rather than unmounted */}
+              {WORKSPACES.filter((tool) => visited.includes(tool.id)).map((tool) => (
+                <div key={tool.id} className={activeFolder === tool.id && !leaving ? "" : "hidden"}>
+                  <Suspense fallback={<ToolLoading />}>
+                    <tool.workspace />
+                  </Suspense>
+                </div>
+              ))}
             </div>
           </div>
         </div>
