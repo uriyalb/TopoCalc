@@ -30,6 +30,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run typecheck:features
       - run: npm run build
 
   build:
@@ -66,6 +67,7 @@ jobs:
         run: |
           npm ci
           npm run lint
+          npm run typecheck:features --if-present
           npm run build
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}/
@@ -76,6 +78,7 @@ jobs:
         run: |
           npm ci
           npm run lint
+          npm run typecheck:features --if-present
           npm run build
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}/stage/
