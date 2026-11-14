@@ -74,6 +74,11 @@ function App() {
           <AuthenticatedApp />
         </Router>
         <Toaster />
+        {import.meta.env.VITE_STAGE === 'true' && (
+          <div className="fixed bottom-2 right-2 z-50 bg-black text-lime-300 px-2 py-1 text-xs font-black uppercase tracking-widest pointer-events-none">
+            Stage preview
+          </div>
+        )}
       </QueryClientProvider>
     </AuthProvider>
   )

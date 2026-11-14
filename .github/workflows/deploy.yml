@@ -1,8 +1,11 @@
 name: CI & Deploy to GitHub Pages
 
+# GitHub Pages serves one site per repository, so every deploy publishes both:
+#   main  -> https://<user>.github.io/<repo>/
+#   stage -> https://<user>.github.io/<repo>/stage/
 on:
   push:
-    branches: [main]
+    branches: [main, stage]
   pull_request:
   workflow_dispatch:
 
@@ -12,43 +15,79 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  build:
+  check:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  build:
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')
+    runs-on: ubuntu-latest
+    env:
+      VITE_STANDALONE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: Check out stage (if it exists)
+        id: stage
+        run: |
+          if git -C main ls-remote --exit-code --heads origin stage >/dev/null; then
+            git clone --depth 1 --branch stage "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" stage
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: '*/package-lock.json'
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
+      - name: Build main
+        working-directory: main
+        run: |
+          npm ci
+          npm run lint
+          npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
-          VITE_STANDALONE: 'true'
 
-      - name: SPA fallback for client-side routes
-        run: cp dist/index.html dist/404.html
+      - name: Build stage
+        if: steps.stage.outputs.exists == 'true'
+        working-directory: stage
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/stage/
+          VITE_STAGE: 'true'
+
+      - name: Assemble site
+        run: |
+          mv main/dist site
+          cp site/index.html site/404.html
+          if [ -d stage/dist ]; then mv stage/dist site/stage; fi
 
       - uses: actions/upload-pages-artifact@v3
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:
-          path: dist
+          path: site
 
   deploy:
-    # Deploy only from main
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:

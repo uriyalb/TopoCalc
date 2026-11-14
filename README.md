@@ -18,7 +18,14 @@ VITE_BASE44_APP_BASE_URL=your_backend_url
 
 ## CI & deployment
 
-`.github/workflows/deploy.yml` lints and builds on pull requests, and on every push to `main` it builds and deploys to **GitHub Pages** (also runnable manually from the Actions tab).
+`.github/workflows/deploy.yml` lints and builds pull requests, and deploys to **GitHub Pages** on every push to `main` or `stage`:
+
+| Branch  | URL |
+| ------- | --- |
+| `main`  | https://uriyalb.github.io/TopoCalc/ |
+| `stage` | https://uriyalb.github.io/TopoCalc/stage/ |
+
+Pages serves one site per repository, so each deploy rebuilds both branches and publishes them together. Try changes on `stage` first, then merge `stage` into `main` to release.
 
 The Pages build is a standalone static site:
 
