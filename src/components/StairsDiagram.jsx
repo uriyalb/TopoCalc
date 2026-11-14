@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { fmtCm, fmtM } from "@/lib/stairs";
 
 const PERSON_CM = 175;
+const HL = "#c026d3"; // highlight colour for the term being explained
+const dim = (on) => ({ stroke: on ? HL : "#000", strokeWidth: on ? 4 : 2 });
 
 function useWidth() {
   const ref = useRef(null);
@@ -51,7 +53,7 @@ const Label = ({ x, y, children, anchor = "middle", color = "#000", size = 11 })
 );
 
 /** Side section of the whole stair, drawn to scale with a 1.75 m figure. */
-export default function StairsDiagram({ stair, landingLength, availableRun }) {
+export default function StairsDiagram({ stair, landingLength, availableRun, highlight }) {
   const [ref, width] = useWidth();
   const { riser, tread, flights, rise, run } = stair;
 
@@ -101,8 +103,8 @@ export default function StairsDiagram({ stair, landingLength, availableRun }) {
   const tick = 5;
 
   return (
-    <div ref={ref} className="bg-lime-50 border-4 border-black shadow-[4px_4px_0px_#000] overflow-hidden">
-      <svg width={width} height={height} role="img" aria-label={`Section of a stair with ${stair.steps} steps`}>
+    <div ref={ref} className="w-full min-w-0 bg-lime-50 border-4 border-black shadow-[4px_4px_0px_#000] overflow-hidden">
+      <svg width={width} height={height} className="block max-w-full" role="img" aria-label={`Section of a stair with ${stair.steps} steps`}>
         <defs>
           <pattern id="stair-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width="8" height="8" fill="#84cc16" />
@@ -112,6 +114,10 @@ export default function StairsDiagram({ stair, landingLength, availableRun }) {
 
         <path d={d} fill="url(#stair-hatch)" stroke="#000" strokeWidth="3" strokeLinejoin="miter" shapeRendering="crispEdges" />
 
+        {highlight === "landing" &&
+          landings.map((l, i) => (
+            <line key={`hl${i}`} x1={X(l.from)} y1={Y(l.y)} x2={X(l.to)} y2={Y(l.y)} stroke={HL} strokeWidth="6" />
+          ))}
         {landings.map((l, i) =>
           (l.to - l.from) * s > 78 ? (
             <Label key={i} x={X((l.from + l.to) / 2)} y={Y(l.y) - 7} size={10}>
@@ -136,7 +142,7 @@ export default function StairsDiagram({ stair, landingLength, availableRun }) {
         )}
 
         {/* Run dimension */}
-        <g stroke="#000" strokeWidth="2">
+        <g {...dim(highlight === "run")}>
           <line x1={X(0)} y1={dimY} x2={X(run)} y2={dimY} />
           <line x1={X(0)} y1={dimY - tick} x2={X(0)} y2={dimY + tick} />
           <line x1={X(run)} y1={dimY - tick} x2={X(run)} y2={dimY + tick} />
@@ -144,7 +150,7 @@ export default function StairsDiagram({ stair, landingLength, availableRun }) {
         <Label x={X(run / 2)} y={dimY + 16} color={over ? "#dc2626" : "#000"}>Run {fmtM(run)} m</Label>
 
         {/* Rise dimension */}
-        <g stroke="#000" strokeWidth="2">
+        <g {...dim(highlight === "rise")}>
           <line x1={dimX} y1={Y(0)} x2={dimX} y2={Y(rise)} />
           <line x1={dimX - tick} y1={Y(0)} x2={dimX + tick} y2={Y(0)} />
           <line x1={dimX - tick} y1={Y(rise)} x2={dimX + tick} y2={Y(rise)} />
@@ -164,9 +170,9 @@ export default function StairsDiagram({ stair, landingLength, availableRun }) {
 }
 
 /** Close-up of two steps with a 28 cm shoe, so riser and tread can be judged at a glance. */
-export function StepDetail({ riser, tread }) {
+export function StepDetail({ riser, tread, highlight }) {
   const s = 2.6;
-  const pad = { l: 104, t: 30, r: 16, b: 14 };
+  const pad = { l: 128, t: 30, r: 16, b: 14 };
   const w = (tread * 2 + 14) * s + pad.l + pad.r;
   const h = (riser * 2 + 16) * s + pad.t + pad.b;
   const X = (cm) => pad.l + cm * s;
@@ -182,20 +188,20 @@ export function StepDetail({ riser, tread }) {
         <rect x={X(1.5)} y={Y(riser + 12)} width={11 * s} height={7 * s} />
       </g>
       {/* tread dimension */}
-      <g stroke="#000" strokeWidth="2">
+      <g {...dim(highlight === "tread")}>
         <line x1={X(0)} y1={Y(riser * 2) - 12} x2={X(tread)} y2={Y(riser * 2) - 12} />
         <line x1={X(0)} y1={Y(riser * 2) - 17} x2={X(0)} y2={Y(riser * 2) - 7} />
         <line x1={X(tread)} y1={Y(riser * 2) - 17} x2={X(tread)} y2={Y(riser * 2) - 7} />
       </g>
-      <text x={X(tread / 2)} y={Y(riser * 2) - 18} textAnchor="middle" fontSize="12" fontWeight="900">{fmtCm(tread)} CM</text>
+      <text x={X(tread / 2)} y={Y(riser * 2) - 18} textAnchor="middle" fontSize="12" fontWeight="900">TREAD {fmtCm(tread)}</text>
       {/* riser dimension */}
-      <g stroke="#000" strokeWidth="2">
+      <g {...dim(highlight === "riser")}>
         <line x1={X(-14) - 10} y1={Y(0)} x2={X(-14) - 10} y2={Y(riser)} />
         <line x1={X(-14) - 15} y1={Y(0)} x2={X(-14) - 5} y2={Y(0)} />
         <line x1={X(-14) - 15} y1={Y(riser)} x2={X(-14) - 5} y2={Y(riser)} />
         <line x1={X(-14) - 5} y1={Y(riser)} x2={X(0)} y2={Y(riser)} strokeDasharray="3 3" strokeWidth="1" />
       </g>
-      <text x={X(-14) - 16} y={Y(riser / 2) + 4} textAnchor="end" fontSize="12" fontWeight="900">{fmtCm(riser)} CM</text>
+      <text x={X(-14) - 16} y={Y(riser / 2) + 4} textAnchor="end" fontSize="12" fontWeight="900">RISER {fmtCm(riser)}</text>
     </svg>
   );
 }

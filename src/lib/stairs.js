@@ -109,6 +109,8 @@ export function generateOptions({ heightCm = null, steps = null, availableRunCm 
       if (rules.oddOnly && n % 2 === 0) continue;
       const riser = roundStep(heightCm / n, rules.roundTo);
       if (riser <= 0 || !inRange(riser)) continue;
+      // Rounding must not add or drop what amounts to a whole step.
+      if (Math.abs(n * riser - heightCm) > riser / 2 + EPS) continue;
       add(n, riser);
     }
     if (options.length === 0) {
@@ -131,3 +133,9 @@ export function bestOption(options) {
 
 export const fmtCm = (v) => `${parseFloat(clean(v).toFixed(1))}`;
 export const fmtM = (cm) => `${parseFloat((cm / 100).toFixed(3))}`;
+
+/** Shortest run an option can be built in (using the shortest allowed tread). */
+export function minRunFor(option, rules) {
+  const { min } = treadRange(option.riser, rules);
+  return buildStair({ steps: option.steps, riser: option.riser, tread: min }, rules).run;
+}
