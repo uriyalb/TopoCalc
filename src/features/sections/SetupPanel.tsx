@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { FileText, FolderOpen, Play, RefreshCw, RotateCcw, Save, Upload } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { ChevronLeft, FileText, FolderOpen, Play, RefreshCw, RotateCcw, Save, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Btn, Panel, Segmented, Step } from '../shared/ui';
 
@@ -45,6 +45,8 @@ function LayerList({ layers, isOn, onPick, type, name, tall }: { layers: string[
  * "From DXF" closes exactly the lines the drawing flags as closed; "Close all" closes every one.
  */
 function ClosedToggle({ checked, onChange, info }: { checked: boolean; onChange: (closed: boolean) => void; info: { lines: number; closedInDxf: number } }) {
+    // Tucked away: closed lines are read from the DXF anyway, so this is only for rings drawn without the flag
+    const [open, setOpen] = useState(false);
     const hint = checked
         ? `All ${info.lines} lines closed · last point joins the first`
         : info.closedInDxf === 0
@@ -53,22 +55,37 @@ function ClosedToggle({ checked, onChange, info }: { checked: boolean; onChange:
                 ? `All ${info.lines} lines are closed in the DXF`
                 : `${info.closedInDxf} of ${info.lines} lines are closed in the DXF`;
     return (
-        <div className="grid gap-1.5">
-            <span className="flex items-center gap-1.5 text-xs font-black uppercase text-black">
-                <ClosedIcon closed={checked || info.closedInDxf > 0} />
-                Closed shapes
-            </span>
-            <Segmented
-                label="Closed shapes"
-                className="w-full [&>button]:flex-1 [&>button]:justify-center [&>button]:whitespace-nowrap"
-                value={checked ? 'all' : 'dxf'}
-                onChange={(v) => onChange(v === 'all')}
-                options={[
-                    { value: 'dxf', label: 'From DXF' },
-                    { value: 'all', label: 'Close all' }
-                ]}
-            />
-            <span className="text-[11px] font-bold leading-tight text-lime-800">{hint}</span>
+        <div className="-mt-1 grid gap-1.5">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                aria-expanded={open}
+                aria-label="Closed shapes"
+                title="Closed shapes"
+                className="flex items-center gap-1.5 justify-self-end px-1 text-black hover:text-lime-700"
+            >
+                {!open && checked && <span className="border-2 border-black bg-lime-300 px-1 text-[10px] font-black uppercase leading-tight">Close all</span>}
+                <ChevronLeft className={cn('h-4 w-4 transition-transform', open && '-rotate-90')} strokeWidth={3} />
+            </button>
+            {open && (
+                <>
+                    <span className="flex items-center gap-1.5 text-xs font-black uppercase text-black">
+                        <ClosedIcon closed={checked || info.closedInDxf > 0} />
+                        Closed shapes
+                    </span>
+                    <Segmented
+                        label="Closed shapes"
+                        className="w-full [&>button]:flex-1 [&>button]:justify-center [&>button]:whitespace-nowrap"
+                        value={checked ? 'all' : 'dxf'}
+                        onChange={(v) => onChange(v === 'all')}
+                        options={[
+                            { value: 'dxf', label: 'From DXF' },
+                            { value: 'all', label: 'Close all' }
+                        ]}
+                    />
+                    <span className="text-[11px] font-bold leading-tight text-lime-800">{hint}</span>
+                </>
+            )}
         </div>
     );
 }
