@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { base44 } from '@/api/base44Client';
@@ -9,6 +9,19 @@ export default function NavigationTracker() {
     const { isAuthenticated } = useAuth();
     const { Pages, mainPage } = pagesConfig;
     const mainPageKey = mainPage ?? Object.keys(Pages)[0];
+    const isFirstView = useRef(true);
+
+    // GoatCounter (index.html) counts the first page load by itself; count each
+    // later in-app navigation (page or ?tool= change) as a view too.
+    useEffect(() => {
+        if (isFirstView.current) {
+            isFirstView.current = false;
+            return;
+        }
+        window.goatcounter?.count?.({
+            path: window.location.pathname + window.location.search,
+        });
+    }, [location.pathname, location.search]);
 
     // Log user activity when navigating to a page
     useEffect(() => {
