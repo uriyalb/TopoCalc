@@ -76,6 +76,8 @@ export interface ProjectFile {
     selectedPath: string;
     selectedContours: string[];
     selectedPlannedContours: string[];
+    closedContours?: boolean;        // existing contours are closed shapes
+    closedPlannedContours?: boolean; // planned contours are closed shapes
     profileData: ProfilePoint[];
     localSectionConfig: LocalSectionConfig;
     crossSections: UserSection[];
