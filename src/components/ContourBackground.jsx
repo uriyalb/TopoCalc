@@ -2,35 +2,40 @@ import React, { useEffect, useRef } from "react";
 
 // Every look-and-feel knob lives here.
 const CONFIG = {
-  cell: 16, // grid spacing in CSS px for sampling the height field
-  scale: 1 / 520, // base noise frequency (lower = bigger landforms)
+  // Grid spacing (CSS px) for sampling the height field. Finer = rounder
+  // curves; it scales with screen area so phones and big monitors cost alike.
+  cellMin: 8,
+  cellMax: 13,
+  cellTarget: 15000, // aim for roughly this many grid points
+  scale: 1 / 560, // base noise frequency (lower = bigger landforms)
   octaves: 2,
-  timeSpeed: 0.009, // how fast the terrain morphs (noise units per second)
+  timeSpeed: 0.008, // how fast the terrain morphs (noise units per second)
   drift: [2.5, 1.5], // slow pan of the whole terrain, px per second
   levelStep: 0.2, // height between contour lines
   indexEvery: 5, // every Nth line is a thicker "index contour"
   line: { color: "77, 124, 15", alpha: 0.32, width: 1.1 }, // lime-700
   index: { color: "63, 98, 18", alpha: 0.5, width: 1.7 }, // lime-800
-  fps: 30,
+  smallLoopFade: [40, 220], // closed loops shorter than this (px) fade in/out instead of popping
+  maxFps: 60,
   hill: {
-    sigma: 110, // radius of one bump, px
-    amplitude: 0.2, // height of one bump at full strength
-    max: 0.95, // soft cap on how tall the hill can grow
-    follow: 0.35, // seconds the hill lags behind the cursor
-    rise: 0.35, // seconds for a bump to grow in
-    decay: 1.5, // seconds per e-fold of fade (gone after ~4-5s)
-    spawnEvery: 0.07, // seconds between bumps while the pointer moves
-    maxBumps: 60,
+    sigma: 120, // radius of the hill, px (shrinks on small screens, see sigmaScreen)
+    sigmaScreen: 0.18, // ...to at most this fraction of the shorter screen side
+    restRate: 1.0, // height added per second while the pointer rests on a spot
+    moveRate: 0.002, // height added per px of travel
+    max: 1.4, // soft cap on how tall the hill can grow
+    follow: 9, // spring stiffness of the point the hill grows under (higher = tighter)
+    rise: 0.45, // seconds for the hill to swell up (keeps the rings easing in)
+    decay: 1.6, // seconds per e-fold of fade (flat again after ~5s)
   },
 };
 
 // ---- 3D simplex noise (Gustavson), seeded once per mount -------------------
 function makeNoise3(seed = Math.random()) {
-  const grad = [
-    [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-    [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-    [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1],
-  ];
+  const grad = new Int8Array([
+    1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0,
+    1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1,
+    0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1,
+  ]);
   const p = new Uint8Array(256);
   for (let i = 0; i < 256; i++) p[i] = i;
   let s = Math.floor(seed * 2 ** 31) || 1;
@@ -43,6 +48,15 @@ function makeNoise3(seed = Math.random()) {
   for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
   const F3 = 1 / 3;
   const G3 = 1 / 6;
+
+  // One simplex corner's contribution. Kept allocation-free: it runs ~100k times a frame.
+  function corner(ii, jj, kk, dx, dy, dz, a, b, d) {
+    let tt = 0.6 - dx * dx - dy * dy - dz * dz;
+    if (tt <= 0) return 0;
+    const g = (perm[ii + a + perm[jj + b + perm[kk + d]]] % 12) * 3;
+    tt *= tt;
+    return tt * tt * (grad[g] * dx + grad[g + 1] * dy + grad[g + 2] * dz);
+  }
 
   return function noise(x, y, z) {
     const t = (x + y + z) * F3;
@@ -63,25 +77,14 @@ function makeNoise3(seed = Math.random()) {
       else if (x0 < z0) { i1 = 0; j1 = 1; k1 = 0; i2 = 0; j2 = 1; k2 = 1; }
       else { i1 = 0; j1 = 1; k1 = 0; i2 = 1; j2 = 1; k2 = 0; }
     }
-    const offs = [
-      [x0, y0, z0, 0, 0, 0],
-      [x0 - i1 + G3, y0 - j1 + G3, z0 - k1 + G3, i1, j1, k1],
-      [x0 - i2 + 2 * G3, y0 - j2 + 2 * G3, z0 - k2 + 2 * G3, i2, j2, k2],
-      [x0 - 1 + 3 * G3, y0 - 1 + 3 * G3, z0 - 1 + 3 * G3, 1, 1, 1],
-    ];
     const ii = i & 255;
     const jj = j & 255;
     const kk = k & 255;
-    let n = 0;
-    for (let c = 0; c < 4; c++) {
-      const [dx, dy, dz, a, b, d] = offs[c];
-      let tt = 0.6 - dx * dx - dy * dy - dz * dz;
-      if (tt > 0) {
-        const g = grad[perm[ii + a + perm[jj + b + perm[kk + d]]] % 12];
-        tt *= tt;
-        n += tt * tt * (g[0] * dx + g[1] * dy + g[2] * dz);
-      }
-    }
+    const n =
+      corner(ii, jj, kk, x0, y0, z0, 0, 0, 0) +
+      corner(ii, jj, kk, x0 - i1 + G3, y0 - j1 + G3, z0 - k1 + G3, i1, j1, k1) +
+      corner(ii, jj, kk, x0 - i2 + 2 * G3, y0 - j2 + 2 * G3, z0 - k2 + 2 * G3, i2, j2, k2) +
+      corner(ii, jj, kk, x0 - 1 + 3 * G3, y0 - 1 + 3 * G3, z0 - 1 + 3 * G3, 1, 1, 1);
     return 32 * n; // roughly [-1, 1]
   };
 }
@@ -89,90 +92,106 @@ function makeNoise3(seed = Math.random()) {
 // ---- Marching squares → joined polylines ------------------------------------
 // Crossing points are identified by the grid edge they sit on, so segments
 // from neighbouring cells share endpoints and can be chained into lines.
-function traceLevel(field, nx, ny, cell, level) {
-  const pts = new Map(); // edgeId -> [x, y]
-  const adj = new Map(); // edgeId -> [neighbour ids]
+// Buffers are typed arrays reused across levels and frames (no per-frame Maps).
+function makeTracer(nx, ny) {
+  const E = nx * ny * 2;
+  const stamp = new Int32Array(E); // which pass last touched this edge
+  const px = new Float32Array(E);
+  const py = new Float32Array(E);
+  const adjA = new Int32Array(E);
+  const adjB = new Int32Array(E);
+  const seen = new Int32Array(E);
+  const touched = new Int32Array(E);
+  let pass = 0;
 
-  const hId = (i, j) => (j * nx + i) * 2;
-  const vId = (i, j) => (j * nx + i) * 2 + 1;
+  return function traceLevel(field, cell, level) {
+    pass++;
+    let nTouched = 0;
 
-  const point = (id, x, y) => {
-    if (!pts.has(id)) pts.set(id, [x, y]);
-    return id;
-  };
-  const link = (a, b) => {
-    const la = adj.get(a);
-    if (la) la.push(b); else adj.set(a, [b]);
-    const lb = adj.get(b);
-    if (lb) lb.push(a); else adj.set(b, [a]);
-  };
+    const point = (id, x, y) => {
+      if (stamp[id] !== pass) {
+        stamp[id] = pass;
+        px[id] = x;
+        py[id] = y;
+        adjA[id] = -1;
+        adjB[id] = -1;
+        touched[nTouched++] = id;
+      }
+      return id;
+    };
+    const attach = (a, b) => {
+      if (adjA[a] === -1) adjA[a] = b; else adjB[a] = b;
+    };
+    const link = (a, b) => { attach(a, b); attach(b, a); };
 
-  for (let j = 0; j < ny - 1; j++) {
-    for (let i = 0; i < nx - 1; i++) {
-      const tl = field[j * nx + i];
-      const tr = field[j * nx + i + 1];
-      const br = field[(j + 1) * nx + i + 1];
-      const bl = field[(j + 1) * nx + i];
-      const code =
-        (tl > level ? 8 : 0) | (tr > level ? 4 : 0) | (br > level ? 2 : 0) | (bl > level ? 1 : 0);
-      if (code === 0 || code === 15) continue;
+    for (let j = 0; j < ny - 1; j++) {
+      for (let i = 0; i < nx - 1; i++) {
+        const tl = field[j * nx + i];
+        const tr = field[j * nx + i + 1];
+        const br = field[(j + 1) * nx + i + 1];
+        const bl = field[(j + 1) * nx + i];
+        const code =
+          (tl > level ? 8 : 0) | (tr > level ? 4 : 0) | (br > level ? 2 : 0) | (bl > level ? 1 : 0);
+        if (code === 0 || code === 15) continue;
 
-      const x = i * cell;
-      const y = j * cell;
-      const lerp = (a, b) => (level - a) / (b - a);
-      const T = () => point(hId(i, j), x + lerp(tl, tr) * cell, y);
-      const R = () => point(vId(i + 1, j), x + cell, y + lerp(tr, br) * cell);
-      const B = () => point(hId(i, j + 1), x + lerp(bl, br) * cell, y + cell);
-      const L = () => point(vId(i, j), x, y + lerp(tl, bl) * cell);
+        const x = i * cell;
+        const y = j * cell;
+        const T = () => point((j * nx + i) * 2, x + ((level - tl) / (tr - tl)) * cell, y);
+        const R = () => point((j * nx + i + 1) * 2 + 1, x + cell, y + ((level - tr) / (br - tr)) * cell);
+        const B = () => point(((j + 1) * nx + i) * 2, x + ((level - bl) / (br - bl)) * cell, y + cell);
+        const L = () => point((j * nx + i) * 2 + 1, x, y + ((level - tl) / (bl - tl)) * cell);
 
-      switch (code) {
-        case 1: case 14: link(L(), B()); break;
-        case 2: case 13: link(B(), R()); break;
-        case 3: case 12: link(L(), R()); break;
-        case 4: case 11: link(T(), R()); break;
-        case 6: case 9: link(T(), B()); break;
-        case 7: case 8: link(L(), T()); break;
-        case 5: {
-          const center = (tl + tr + br + bl) / 4 > level;
-          if (center) { link(L(), T()); link(B(), R()); }
-          else { link(L(), B()); link(T(), R()); }
-          break;
+        switch (code) {
+          case 1: case 14: link(L(), B()); break;
+          case 2: case 13: link(B(), R()); break;
+          case 3: case 12: link(L(), R()); break;
+          case 4: case 11: link(T(), R()); break;
+          case 6: case 9: link(T(), B()); break;
+          case 7: case 8: link(L(), T()); break;
+          case 5: {
+            if ((tl + tr + br + bl) / 4 > level) { link(L(), T()); link(B(), R()); }
+            else { link(L(), B()); link(T(), R()); }
+            break;
+          }
+          case 10: {
+            if ((tl + tr + br + bl) / 4 > level) { link(T(), R()); link(L(), B()); }
+            else { link(L(), T()); link(B(), R()); }
+            break;
+          }
+          default: break;
         }
-        case 10: {
-          const center = (tl + tr + br + bl) / 4 > level;
-          if (center) { link(T(), R()); link(L(), B()); }
-          else { link(L(), T()); link(B(), R()); }
-          break;
-        }
-        default: break;
       }
     }
-  }
 
-  const lines = [];
-  const seen = new Set();
-  const walk = (start) => {
-    const line = [pts.get(start)];
-    seen.add(start);
-    let prev = -1;
-    let cur = start;
-    for (;;) {
-      const next = adj.get(cur).find((n) => n !== prev && !seen.has(n));
-      if (next === undefined) {
-        // Closed if we came back next to the start.
-        const closed = cur !== start && adj.get(cur).includes(start) && line.length > 2;
-        return { line, closed };
+    const lines = [];
+    const walk = (start) => {
+      const line = [[px[start], py[start]]];
+      seen[start] = pass;
+      let cur = start;
+      for (;;) {
+        const a = adjA[cur];
+        const b = adjB[cur];
+        const next = a !== -1 && seen[a] !== pass ? a : b !== -1 && seen[b] !== pass ? b : -1;
+        if (next === -1) {
+          const closed = cur !== start && (a === start || b === start) && line.length > 2;
+          return { line, closed };
+        }
+        seen[next] = pass;
+        line.push([px[next], py[next]]);
+        cur = next;
       }
-      seen.add(next);
-      line.push(pts.get(next));
-      prev = cur;
-      cur = next;
+    };
+    // Open lines first (they start at the screen edge), then loops.
+    for (let k = 0; k < nTouched; k++) {
+      const id = touched[k];
+      if (seen[id] !== pass && adjB[id] === -1) lines.push(walk(id));
     }
+    for (let k = 0; k < nTouched; k++) {
+      const id = touched[k];
+      if (seen[id] !== pass) lines.push(walk(id));
+    }
+    return lines;
   };
-  // Open lines first (they start at the screen edge), then loops.
-  for (const [id, n] of adj) if (n.length === 1 && !seen.has(id)) lines.push(walk(id));
-  for (const id of adj.keys()) if (!seen.has(id)) lines.push(walk(id));
-  return lines;
 }
 
 // Chaikin corner cutting: rounds every corner.
@@ -215,6 +234,17 @@ function strokeSmooth(ctx, pts, closed) {
   }
 }
 
+// Total length of a polyline, in px.
+function lineLength(pts, closed) {
+  let len = 0;
+  for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+  if (closed && pts.length > 1) {
+    const a = pts[pts.length - 1];
+    len += Math.hypot(a[0] - pts[0][0], a[1] - pts[0][1]);
+  }
+  return len;
+}
+
 export default function ContourBackground({ className = "" }) {
   const canvasRef = useRef(null);
 
@@ -223,13 +253,21 @@ export default function ContourBackground({ className = "" }) {
     const ctx = canvas.getContext("2d");
     const noise = makeNoise3();
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const { cell, hill } = CONFIG;
+    const { hill } = CONFIG;
 
     let w = 0;
     let h = 0;
+    let cell = 10;
     let nx = 0;
     let ny = 0;
     let field = new Float32Array(0);
+    let traceLevel = null;
+    // The hill is a persistent height layer in screen space: the pointer paints
+    // into `source`, which fades out; `swell` eases toward it so rings grow in.
+    let source = new Float32Array(0);
+    let swell = new Float32Array(0);
+    let hillActive = false;
+    let sigma = hill.sigma;
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -240,43 +278,115 @@ export default function ContourBackground({ className = "" }) {
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cell = Math.min(CONFIG.cellMax, Math.max(CONFIG.cellMin, Math.sqrt((w * h) / CONFIG.cellTarget)));
       // One extra cell of margin past each edge so lines run off-screen cleanly.
       nx = Math.ceil(w / cell) + 3;
       ny = Math.ceil(h / cell) + 3;
       field = new Float32Array(nx * ny);
+      traceLevel = makeTracer(nx, ny);
+      source = new Float32Array(nx * ny);
+      swell = new Float32Array(nx * ny);
+      hillActive = false;
+      sigma = Math.min(hill.sigma, hill.sigmaScreen * Math.min(w, h));
     };
 
-    // Pointer state: the hill follows a lagging point and leaves fading bumps.
-    const pointer = { x: 0, y: 0, active: false, moved: false };
-    const follower = { x: 0, y: 0, init: false };
-    let bumps = []; // { x, y, born }
-    let spawnClock = 0;
+    // ---- Pointer -----------------------------------------------------------
+    // Mouse/pen use pointer events; touch uses touch events, because a drag on
+    // a phone turns into a scroll gesture and the browser cancels the pointer
+    // stream after the first few moves, while touchmove keeps firing.
+    const target = { x: 0, y: 0, down: false };
+    const follower = { x: 0, y: 0, vx: 0, vy: 0, placed: false };
 
-    const onMove = (e) => {
-      pointer.x = e.clientX;
-      pointer.y = e.clientY;
-      pointer.active = true;
-      pointer.moved = true;
-      if (!follower.init) {
-        follower.x = e.clientX;
-        follower.y = e.clientY;
-        follower.init = true;
+    const placeAt = (x, y) => {
+      target.x = x;
+      target.y = y;
+      if (!target.down || !follower.placed) {
+        // A new touch or the mouse entering: start right there, no streak across the screen.
+        follower.x = x;
+        follower.y = y;
+        follower.vx = 0;
+        follower.vy = 0;
+        follower.placed = true;
       }
+      target.down = true;
     };
-    const onLeave = () => { pointer.active = false; };
+    const onPointerMove = (e) => {
+      if (e.pointerType === "touch") return;
+      placeAt(e.clientX, e.clientY);
+    };
+    const onMouseLeave = () => { target.down = false; };
+    const onTouch = (e) => {
+      const t0 = e.touches[0];
+      if (!t0) return;
+      if (e.type === "touchstart") target.down = false; // jump to the new finger
+      placeAt(t0.clientX, t0.clientY);
+    };
+    const onTouchEnd = (e) => {
+      if (e.touches.length === 0) target.down = false;
+    };
 
-    const bumpStrength = (age) => {
-      const rise = 1 - Math.exp(-age / hill.rise);
-      const fall = Math.exp(-Math.max(0, age - hill.rise) / hill.decay);
-      return rise * fall;
+    // Add a Gaussian of the given total height at (x, y) into `source`.
+    const paint = (x, y, amount) => {
+      if (amount <= 0) return;
+      const r = sigma * 3;
+      const inv2s2 = 1 / (2 * sigma * sigma);
+      // Grid point (i, j) sits at screen (i*cell - cell, j*cell - cell).
+      const i0 = Math.max(0, Math.floor((x - r) / cell) + 1);
+      const i1 = Math.min(nx - 1, Math.ceil((x + r) / cell) + 1);
+      const j0 = Math.max(0, Math.floor((y - r) / cell) + 1);
+      const j1 = Math.min(ny - 1, Math.ceil((y + r) / cell) + 1);
+      for (let j = j0; j <= j1; j++) {
+        const dy = j * cell - cell - y;
+        const row = j * nx;
+        for (let i = i0; i <= i1; i++) {
+          const dx = i * cell - cell - x;
+          source[row + i] += amount * Math.exp(-(dx * dx + dy * dy) * inv2s2);
+        }
+      }
+      hillActive = true;
+    };
+
+    const stepHill = (dt) => {
+      if (follower.placed) {
+        // Critically damped spring: smooth start and stop, no overshoot.
+        const k = hill.follow;
+        const steps = Math.ceil(dt / (1 / 120));
+        const sdt = dt / steps;
+        let travelled = 0;
+        for (let s = 0; s < steps; s++) {
+          const ax = k * k * (target.x - follower.x) - 2 * k * follower.vx;
+          const ay = k * k * (target.y - follower.y) - 2 * k * follower.vy;
+          follower.vx += ax * sdt;
+          follower.vy += ay * sdt;
+          follower.x += follower.vx * sdt;
+          follower.y += follower.vy * sdt;
+          travelled += Math.hypot(follower.vx, follower.vy) * sdt;
+        }
+        if (target.down) paint(follower.x, follower.y, hill.restRate * dt + hill.moveRate * travelled);
+      }
+      if (!hillActive) return;
+      const fade = Math.exp(-dt / hill.decay);
+      const ease = 1 - Math.exp(-dt / hill.rise);
+      let any = false;
+      for (let k = 0; k < source.length; k++) {
+        const s = source[k] * fade;
+        source[k] = s;
+        const v = swell[k] + (s - swell[k]) * ease;
+        swell[k] = v;
+        if (v > 1e-4 || s > 1e-4) any = true;
+      }
+      if (!any && !target.down) {
+        source.fill(0);
+        swell.fill(0);
+        hillActive = false;
+      }
     };
 
     const render = (t) => {
-      const ox = (t * CONFIG.drift[0]) - cell;
-      const oy = (t * CONFIG.drift[1]) - cell;
+      const ox = t * CONFIG.drift[0] - cell;
+      const oy = t * CONFIG.drift[1] - cell;
       const z = t * CONFIG.timeSpeed;
 
-      // Base terrain.
       for (let j = 0; j < ny; j++) {
         for (let i = 0; i < nx; i++) {
           const x = (i * cell + ox) * CONFIG.scale;
@@ -289,38 +399,12 @@ export default function ContourBackground({ className = "" }) {
             amp *= 0.45;
             freq *= 2.1;
           }
+          const s = swell[j * nx + i];
+          if (s > 0) v += hill.max * (1 - Math.exp(-s / hill.max));
           field[j * nx + i] = v;
         }
       }
 
-      // Mouse hill: sum bumps into a scratch layer, then soft-cap and add.
-      if (bumps.length) {
-        const hillLayer = new Float32Array(nx * ny);
-        const r = hill.sigma * 3;
-        const inv2s2 = 1 / (2 * hill.sigma * hill.sigma);
-        for (const b of bumps) {
-          const a = hill.amplitude * bumpStrength(t - b.born);
-          if (a < 0.002) continue;
-          // Grid point (i, j) sits at screen (i*cell - cell, j*cell - cell).
-          const i0 = Math.max(0, Math.floor((b.x - r) / cell) + 1);
-          const i1 = Math.min(nx - 1, Math.ceil((b.x + r) / cell) + 1);
-          const j0 = Math.max(0, Math.floor((b.y - r) / cell) + 1);
-          const j1 = Math.min(ny - 1, Math.ceil((b.y + r) / cell) + 1);
-          for (let j = j0; j <= j1; j++) {
-            const dy = j * cell - cell - b.y;
-            for (let i = i0; i <= i1; i++) {
-              const dx = i * cell - cell - b.x;
-              hillLayer[j * nx + i] += a * Math.exp(-(dx * dx + dy * dy) * inv2s2);
-            }
-          }
-        }
-        for (let k = 0; k < field.length; k++) {
-          const s = hillLayer[k];
-          if (s > 0) field[k] += hill.max * (1 - Math.exp(-s / hill.max));
-        }
-      }
-
-      // Contours.
       ctx.clearRect(0, 0, w, h);
       ctx.save();
       ctx.translate(-cell, -cell);
@@ -333,15 +417,32 @@ export default function ContourBackground({ className = "" }) {
         if (field[k] > max) max = field[k];
       }
       const step = CONFIG.levelStep;
+      const [fadeFrom, fadeTo] = CONFIG.smallLoopFade;
       for (let n = Math.ceil(min / step); n * step < max; n++) {
         const isIndex = ((n % CONFIG.indexEvery) + CONFIG.indexEvery) % CONFIG.indexEvery === 0;
         const style = isIndex ? CONFIG.index : CONFIG.line;
-        ctx.strokeStyle = `rgba(${style.color}, ${style.alpha})`;
         ctx.lineWidth = style.width;
+        const full = `rgba(${style.color}, ${style.alpha})`;
+        ctx.strokeStyle = full;
         ctx.beginPath();
-        for (const { line, closed } of traceLevel(field, nx, ny, cell, n * step)) {
+        for (const { line, closed } of traceLevel(field, cell, n * step)) {
           if (line.length < 2) continue;
-          strokeSmooth(ctx, chaikin(chaikin(chaikin(line, closed), closed), closed), closed);
+          const pts = chaikin(chaikin(chaikin(line, closed), closed), closed);
+          if (closed) {
+            // Tiny loops (a peak just appearing or vanishing) fade by size.
+            const f = (lineLength(pts, true) - fadeFrom) / (fadeTo - fadeFrom);
+            if (f <= 0) continue;
+            if (f < 1) {
+              ctx.save();
+              ctx.strokeStyle = `rgba(${style.color}, ${style.alpha * f * f * (3 - 2 * f)})`;
+              ctx.beginPath();
+              strokeSmooth(ctx, pts, true);
+              ctx.stroke();
+              ctx.restore();
+              continue;
+            }
+          }
+          strokeSmooth(ctx, pts, closed);
         }
         ctx.stroke();
       }
@@ -354,33 +455,17 @@ export default function ContourBackground({ className = "" }) {
     let last = performance.now();
     let acc = 0;
     let t = Math.random() * 100; // random starting landscape
-    const frameTime = 1 / CONFIG.fps;
+    const minFrame = 1 / CONFIG.maxFps - 0.002;
 
     const tick = (now) => {
       raf = requestAnimationFrame(tick);
-      const dt = Math.min(0.1, (now - last) / 1000);
+      acc += Math.min(0.1, (now - last) / 1000);
       last = now;
-      acc += dt;
-      if (acc < frameTime) return;
-      const step = acc;
+      if (acc < minFrame) return;
+      const dt = acc;
       acc = 0;
-      t += step;
-
-      if (follower.init) {
-        const k = 1 - Math.exp(-step / hill.follow);
-        follower.x += (pointer.x - follower.x) * k;
-        follower.y += (pointer.y - follower.y) * k;
-        spawnClock += step;
-        const stillCatchingUp = Math.hypot(pointer.x - follower.x, pointer.y - follower.y) > 2;
-        if (pointer.active && (pointer.moved || stillCatchingUp) && spawnClock >= hill.spawnEvery) {
-          spawnClock = 0;
-          bumps.push({ x: follower.x, y: follower.y, born: t });
-          if (bumps.length > hill.maxBumps) bumps.shift();
-        }
-        pointer.moved = false;
-      }
-      bumps = bumps.filter((b) => bumpStrength(t - b.born) > 0.01 || t - b.born < hill.rise);
-
+      t += dt;
+      stepHill(dt);
       render(t);
     };
 
@@ -389,7 +474,6 @@ export default function ContourBackground({ className = "" }) {
       render(t);
     };
     const onVisibility = () => {
-      if (reduceMotion) return;
       if (document.hidden) cancelAnimationFrame(raf);
       else {
         last = performance.now();
@@ -401,8 +485,13 @@ export default function ContourBackground({ className = "" }) {
     if (reduceMotion) {
       render(t);
     } else {
-      window.addEventListener("pointermove", onMove, { passive: true });
-      document.documentElement.addEventListener("pointerleave", onLeave);
+      window.addEventListener("pointermove", onPointerMove, { passive: true });
+      window.addEventListener("pointerdown", onPointerMove, { passive: true });
+      document.addEventListener("mouseleave", onMouseLeave);
+      window.addEventListener("touchstart", onTouch, { passive: true });
+      window.addEventListener("touchmove", onTouch, { passive: true });
+      window.addEventListener("touchend", onTouchEnd, { passive: true });
+      window.addEventListener("touchcancel", onTouchEnd, { passive: true });
       document.addEventListener("visibilitychange", onVisibility);
       raf = requestAnimationFrame(tick);
     }
@@ -410,8 +499,13 @@ export default function ContourBackground({ className = "" }) {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
-      window.removeEventListener("pointermove", onMove);
-      document.documentElement.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerdown", onPointerMove);
+      document.removeEventListener("mouseleave", onMouseLeave);
+      window.removeEventListener("touchstart", onTouch);
+      window.removeEventListener("touchmove", onTouch);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
