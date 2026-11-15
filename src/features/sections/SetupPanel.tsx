@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { FileText, FolderOpen, Play, RefreshCw, RotateCcw, Save, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Btn, Panel, Step } from '../shared/ui';
+import { Btn, Panel, Segmented, Step } from '../shared/ui';
 
 interface SetupPanelProps {
     status: string;
@@ -41,24 +41,35 @@ function LayerList({ layers, isOn, onPick, type, name, tall }: { layers: string[
 }
 
 /**
- * Are these contours rings? When on, each line's last point is joined to its first,
- * so the closing side counts as contour too. The hint says what the DXF itself claims.
+ * Closed shapes (rings): the last point joins the first, so the closing side counts as contour.
+ * "From DXF" closes exactly the lines the drawing flags as closed; "Close all" closes every one.
  */
 function ClosedToggle({ checked, onChange, info }: { checked: boolean; onChange: (closed: boolean) => void; info: { lines: number; closedInDxf: number } }) {
+    const hint = checked
+        ? `All ${info.lines} lines closed · last point joins the first`
+        : info.closedInDxf === 0
+            ? 'No line is closed in the DXF'
+            : info.closedInDxf === info.lines
+                ? `All ${info.lines} lines are closed in the DXF`
+                : `${info.closedInDxf} of ${info.lines} lines are closed in the DXF`;
     return (
-        <label className={cn('flex cursor-pointer items-start gap-2 border-2 border-black px-2 py-1.5', checked ? 'bg-lime-300' : 'bg-white hover:bg-lime-100')}>
-            <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-lime-800" />
-            <span className="min-w-0">
-                <span className="flex items-center gap-1.5 text-xs font-black uppercase text-black">
-                    <ClosedIcon closed={checked} />
-                    Closed shapes
-                </span>
-                <span className="block text-[11px] font-bold leading-tight text-lime-800">
-                    {checked ? 'Last point joins the first' : 'Lines end where they are drawn'}
-                    {info.closedInDxf > 0 && ` · ${info.closedInDxf} of ${info.lines} closed in the DXF`}
-                </span>
+        <div className="grid gap-1.5">
+            <span className="flex items-center gap-1.5 text-xs font-black uppercase text-black">
+                <ClosedIcon closed={checked || info.closedInDxf > 0} />
+                Closed shapes
             </span>
-        </label>
+            <Segmented
+                label="Closed shapes"
+                className="w-full [&>button]:flex-1 [&>button]:justify-center [&>button]:whitespace-nowrap"
+                value={checked ? 'all' : 'dxf'}
+                onChange={(v) => onChange(v === 'all')}
+                options={[
+                    { value: 'dxf', label: 'From DXF' },
+                    { value: 'all', label: 'Close all' }
+                ]}
+            />
+            <span className="text-[11px] font-bold leading-tight text-lime-800">{hint}</span>
+        </div>
     );
 }
 

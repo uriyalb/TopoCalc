@@ -3,7 +3,7 @@ import { AlertTriangle, LayoutTemplate, MapPin, RefreshCw, Ruler, TrendingUp } f
 import { dxfService } from './dxfService';
 import { storageService } from './storageService';
 import { generateProfileData } from './geometry';
-import { closeContours, describeContours } from './closeContours';
+import { closeContours, describeContours, honorDxfClosed } from './closeContours';
 import SetupPanel from './SetupPanel';
 import LongSection from './LongSection';
 import CrossSections from './CrossSections';
@@ -59,19 +59,22 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
     const [selectedContours, setSelectedContours] = useState<string[]>([]);
     const [selectedPlannedContours, setSelectedPlannedContours] = useState<string[]>([]);
 
-    // Contours that are rings: join each line's last point to its first
+    // Lines the DXF flags as closed are closed automatically. These two force a whole
+    // contour group closed, for rings that were drawn without the flag.
     const [closedContours, setClosedContours] = useState(false);
     const [closedPlannedContours, setClosedPlannedContours] = useState(false);
 
-    // What every drawing works from: the DXF entities, with the chosen contour groups closed.
-    // The path layer is never closed, even if it is also picked as a contour layer.
+    // The drawing as the DXF describes it: closed lines are closed (path included).
+    const dxfEntities = useMemo(() => honorDxfClosed(dxfData?.entities ?? []), [dxfData]);
+
+    // What every drawing works from: the above, plus the contour groups forced closed.
+    // Forcing never touches the path layer, even if it is also picked as a contour layer.
     const entities = useMemo(() => {
-        const raw = dxfData?.entities ?? [];
         const notPath = (l: string) => l !== selectedPath;
         const existing = closedContours ? selectedContours.filter(notPath) : [];
         const planned = closedPlannedContours ? selectedPlannedContours.filter(notPath) : [];
-        return closeContours(raw, [...existing, ...planned]);
-    }, [dxfData, selectedPath, selectedContours, selectedPlannedContours, closedContours, closedPlannedContours]);
+        return closeContours(dxfEntities, [...existing, ...planned]);
+    }, [dxfEntities, selectedPath, selectedContours, selectedPlannedContours, closedContours, closedPlannedContours]);
 
     const contourInfo = useMemo(() => describeContours(dxfData?.entities ?? [], selectedContours), [dxfData, selectedContours]);
     const plannedInfo = useMemo(() => describeContours(dxfData?.entities ?? [], selectedPlannedContours), [dxfData, selectedPlannedContours]);
