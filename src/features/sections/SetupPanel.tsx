@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ChevronLeft, FileText, FolderOpen, Play, RefreshCw, RotateCcw, Save, Upload } from 'lucide-react';
+import { ChevronRight, FileText, FolderOpen, Play, RefreshCw, RotateCcw, Save, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Btn, Panel, Segmented, Step } from '../shared/ui';
 
@@ -62,10 +62,10 @@ function ClosedToggle({ checked, onChange, info }: { checked: boolean; onChange:
                 aria-expanded={open}
                 aria-label="Closed shapes"
                 title="Closed shapes"
-                className="flex items-center gap-1.5 justify-self-end px-1 text-black hover:text-lime-700"
+                className="flex items-center gap-1.5 justify-self-start px-1 text-black hover:text-lime-700"
             >
+                <ChevronRight className={cn('h-4 w-4 transition-transform', open && 'rotate-90')} strokeWidth={3} />
                 {!open && checked && <span className="border-2 border-black bg-lime-300 px-1 text-[10px] font-black uppercase leading-tight">Close all</span>}
-                <ChevronLeft className={cn('h-4 w-4 transition-transform', open && '-rotate-90')} strokeWidth={3} />
             </button>
             {open && (
                 <>
