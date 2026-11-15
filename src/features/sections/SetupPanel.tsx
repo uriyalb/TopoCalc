@@ -1,15 +1,22 @@
-import React, { useRef } from 'react';
-import { FileText, FolderOpen, Play, RefreshCw, RotateCcw, Save, Upload } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { ChevronLeft, FileText, FolderOpen, Play, RefreshCw, RotateCcw, Save, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Btn, Panel, Step } from '../shared/ui';
+import { Btn, Panel, Segmented, Step } from '../shared/ui';
 
 interface SetupPanelProps {
     status: string;
+    profileStale: boolean;
     fileName: string;
     layers: string[];
     selectedPath: string;
     selectedContours: string[];
     selectedPlannedContours: string[];
+    closedContours: boolean;
+    closedPlannedContours: boolean;
+    contourInfo: { lines: number; closedInDxf: number };
+    plannedInfo: { lines: number; closedInDxf: number };
+    onClosedContoursChange: (closed: boolean) => void;
+    onClosedPlannedContoursChange: (closed: boolean) => void;
     onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onPathChange: (layer: string) => void;
     onContourChange: (layer: string) => void;
@@ -33,13 +40,79 @@ function LayerList({ layers, isOn, onPick, type, name, tall }: { layers: string[
     );
 }
 
+/**
+ * Closed shapes (rings): the last point joins the first, so the closing side counts as contour.
+ * "From DXF" closes exactly the lines the drawing flags as closed; "Close all" closes every one.
+ */
+function ClosedToggle({ checked, onChange, info }: { checked: boolean; onChange: (closed: boolean) => void; info: { lines: number; closedInDxf: number } }) {
+    // Tucked away: closed lines are read from the DXF anyway, so this is only for rings drawn without the flag
+    const [open, setOpen] = useState(false);
+    const hint = checked
+        ? `All ${info.lines} lines closed · last point joins the first`
+        : info.closedInDxf === 0
+            ? 'No line is closed in the DXF'
+            : info.closedInDxf === info.lines
+                ? `All ${info.lines} lines are closed in the DXF`
+                : `${info.closedInDxf} of ${info.lines} lines are closed in the DXF`;
+    return (
+        <div className="-mt-1 grid gap-1.5">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                aria-expanded={open}
+                aria-label="Closed shapes"
+                title="Closed shapes"
+                className="flex items-center gap-1.5 justify-self-end px-1 text-black hover:text-lime-700"
+            >
+                {!open && checked && <span className="border-2 border-black bg-lime-300 px-1 text-[10px] font-black uppercase leading-tight">Close all</span>}
+                <ChevronLeft className={cn('h-4 w-4 transition-transform', open && '-rotate-90')} strokeWidth={3} />
+            </button>
+            {open && (
+                <>
+                    <span className="flex items-center gap-1.5 text-xs font-black uppercase text-black">
+                        <ClosedIcon closed={checked || info.closedInDxf > 0} />
+                        Closed shapes
+                    </span>
+                    <Segmented
+                        label="Closed shapes"
+                        className="w-full [&>button]:flex-1 [&>button]:justify-center [&>button]:whitespace-nowrap"
+                        value={checked ? 'all' : 'dxf'}
+                        onChange={(v) => onChange(v === 'all')}
+                        options={[
+                            { value: 'dxf', label: 'From DXF' },
+                            { value: 'all', label: 'Close all' }
+                        ]}
+                    />
+                    <span className="text-[11px] font-bold leading-tight text-lime-800">{hint}</span>
+                </>
+            )}
+        </div>
+    );
+}
+
+/** A ring that is either complete or has a gap — the whole idea in 16 pixels. */
+function ClosedIcon({ closed }: { closed: boolean }) {
+    return (
+        <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            {closed ? <path d="M3 4 L12 2 L14 11 L5 14 Z" strokeLinejoin="miter" /> : <path d="M12 2 L14 11 L5 14 L3 4" strokeLinejoin="miter" />}
+        </svg>
+    );
+}
+
 const SetupPanel: React.FC<SetupPanelProps> = ({
     status,
+    profileStale,
     fileName,
     layers,
     selectedPath,
     selectedContours,
     selectedPlannedContours,
+    closedContours,
+    closedPlannedContours,
+    contourInfo,
+    plannedInfo,
+    onClosedContoursChange,
+    onClosedPlannedContoursChange,
     onFileUpload,
     onPathChange,
     onContourChange,
@@ -114,17 +187,19 @@ const SetupPanel: React.FC<SetupPanelProps> = ({
                     <div className="grid gap-2">
                         <Step n={3} title="Existing contours" note={`${selectedContours.length} picked`} done={selectedContours.length > 0} />
                         <LayerList layers={layers} type="checkbox" name="contourLayer" isOn={(l) => selectedContours.includes(l)} onPick={onContourChange} tall />
+                        {selectedContours.length > 0 && <ClosedToggle checked={closedContours} onChange={onClosedContoursChange} info={contourInfo} />}
                     </div>
 
                     {/* 4. Planned contours */}
                     <div className="grid gap-2">
                         <Step n={4} title="Planned contours" note={selectedPlannedContours.length > 0 ? `${selectedPlannedContours.length} picked` : 'Optional'} done={selectedPlannedContours.length > 0} />
                         <LayerList layers={layers} type="checkbox" name="plannedLayer" isOn={(l) => selectedPlannedContours.includes(l)} onPick={onPlannedContourChange} tall />
+                        {selectedPlannedContours.length > 0 && <ClosedToggle checked={closedPlannedContours} onChange={onClosedPlannedContoursChange} info={plannedInfo} />}
                     </div>
 
                     <Btn variant="primary" onClick={onGenerate} disabled={!ready || isProcessing}>
                         {isProcessing ? <RefreshCw className="animate-spin" /> : <Play fill="currentColor" />}
-                        {isProcessing ? 'Working…' : 'Draw long section'}
+                        {isProcessing ? 'Working…' : profileStale ? 'Redraw long section' : 'Draw long section'}
                     </Btn>
                 </>
             )}

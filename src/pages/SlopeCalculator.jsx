@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ContourBackground from "../components/ContourBackground";
 import ResultCard from "../components/ResultCard";
 import StairsCalculator from "../components/StairsCalculator";
+import PointsSection from "../components/PointsSection";
 import { BetaTag } from "../components/BetaTag";
 import { Calculator, Ruler, LineChart, ArrowBigUp, MoveUp, MapPin, Menu, X, Route, Shovel } from "lucide-react";
 
@@ -747,30 +748,15 @@ export default function SlopeCalculator() {
                                   extra={`From ${pointsToSlope.point1Height}m to ${pointsToSlope.point2Height}m elevation`}
                                 />
                                 
-                                <Card className="bg-lime-800 text-lime-100 border-4 border-black shadow-[4px_4px_0px_#000] p-4">
-                                  <div className="text-center">
-                                    <h4 className="text-sm font-bold mb-2 uppercase tracking-wide">
-                                      Elevation Profile
-                                    </h4>
-                                    <div className="flex justify-between items-end h-20 bg-lime-900 rounded px-4 py-2">
-                                      <div className="text-center flex flex-col items-center">
-                                        <div className="w-3 h-3 bg-lime-300 rounded-full mb-1"></div>
-                                        <div className="text-xs font-bold">Point 1</div>
-                                        <div className="text-xs">{pointsToSlope.point1Height}m</div>
-                                      </div>
-                                      <div className="flex-1 h-px bg-lime-300 mx-2 relative">
-                                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-xs font-bold bg-lime-800 px-1">
-                                          {pointsToSlope.slope}%
-                                        </div>
-                                      </div>
-                                      <div className="text-center flex flex-col items-center">
-                                        <div className="w-3 h-3 bg-lime-300 rounded-full mb-1"></div>
-                                        <div className="text-xs font-bold">Point 2</div>
-                                        <div className="text-xs">{pointsToSlope.point2Height}m</div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </Card>
+                                {[pointsToSlope.point1Height, pointsToSlope.point2Height, pointsToSlope.horizontalDistance].every((v) => Number.isFinite(parseFloat(v))) &&
+                                  parseFloat(pointsToSlope.horizontalDistance) !== 0 && (
+                                    <PointsSection
+                                      z1={parseFloat(pointsToSlope.point1Height)}
+                                      z2={parseFloat(pointsToSlope.point2Height)}
+                                      distance={parseFloat(pointsToSlope.horizontalDistance)}
+                                      slope={pointsToSlope.slope}
+                                    />
+                                  )}
                               </div>
                             )}
                           </div>

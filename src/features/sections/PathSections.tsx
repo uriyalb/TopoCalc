@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, LayoutTemplate, MapPin, Ruler, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { AlertTriangle, LayoutTemplate, MapPin, RefreshCw, Ruler, TrendingUp } from 'lucide-react';
 import { dxfService } from './dxfService';
 import { storageService } from './storageService';
 import { generateProfileData } from './geometry';
+import { closeContours, describeContours, honorDxfClosed } from './closeContours';
 import SetupPanel from './SetupPanel';
 import LongSection from './LongSection';
 import CrossSections from './CrossSections';
@@ -10,7 +11,7 @@ import FreeSection from './FreeSection';
 import DiagnosticReport from './DiagnosticReport';
 import { AppStatus, DxfParsed, ProfilePoint, ProcessingStep, LocalSectionConfig, UserSection, ProjectFile } from './types';
 import { ProjectDialog, ProjectEntry } from '../shared/ProjectDialog';
-import { ConfirmDialog, ConfirmRequest, EmptyState, Hint, Notice, Panel, SubTabs, ToolCard, useNotice } from '../shared/ui';
+import { Btn, ConfirmDialog, ConfirmRequest, EmptyState, Hint, Notice, Panel, SubTabs, ToolCard, useNotice } from '../shared/ui';
 
 // Tab Definitions
 type Tab = 'PROFILE' | 'SECTION' | 'LOCAL';
@@ -24,10 +25,13 @@ const TABS: { value: Tab; label: string; icon: React.ReactNode }[] = [
 interface ModeConfig {
     path: string;
     contours: string[];
+    closed: boolean; // were the contours treated as closed shapes when this was drawn
     data: ProfilePoint[];
 }
 
-const initialConfig: ModeConfig = { path: '', contours: [], data: [] };
+const initialConfig: ModeConfig = { path: '', contours: [], closed: false, data: [] };
+
+const sameLayers = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
 
 const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
     // Application State
@@ -54,6 +58,26 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
     const [selectedPath, setSelectedPath] = useState<string>('');
     const [selectedContours, setSelectedContours] = useState<string[]>([]);
     const [selectedPlannedContours, setSelectedPlannedContours] = useState<string[]>([]);
+
+    // Lines the DXF flags as closed are closed automatically. These two force a whole
+    // contour group closed, for rings that were drawn without the flag.
+    const [closedContours, setClosedContours] = useState(false);
+    const [closedPlannedContours, setClosedPlannedContours] = useState(false);
+
+    // The drawing as the DXF describes it: closed lines are closed (path included).
+    const dxfEntities = useMemo(() => honorDxfClosed(dxfData?.entities ?? []), [dxfData]);
+
+    // What every drawing works from: the above, plus the contour groups forced closed.
+    // Forcing never touches the path layer, even if it is also picked as a contour layer.
+    const entities = useMemo(() => {
+        const notPath = (l: string) => l !== selectedPath;
+        const existing = closedContours ? selectedContours.filter(notPath) : [];
+        const planned = closedPlannedContours ? selectedPlannedContours.filter(notPath) : [];
+        return closeContours(dxfEntities, [...existing, ...planned]);
+    }, [dxfEntities, selectedPath, selectedContours, selectedPlannedContours, closedContours, closedPlannedContours]);
+
+    const contourInfo = useMemo(() => describeContours(dxfData?.entities ?? [], selectedContours), [dxfData, selectedContours]);
+    const plannedInfo = useMemo(() => describeContours(dxfData?.entities ?? [], selectedPlannedContours), [dxfData, selectedPlannedContours]);
 
     // --- Persisted State for Components ---
     const [localSectionConfig, setLocalSectionConfig] = useState<LocalSectionConfig>({
@@ -142,14 +166,14 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
         setTimeout(() => {
             try {
                 // Call geometry engine for Profile (Existing only for now as per design)
-                const result = generateProfileData(selectedPath, selectedContours, dxfData.entities);
+                const result = generateProfileData(selectedPath, selectedContours, entities);
                 setProcessingLogs(result.logs);
 
                 if (!result.success || result.points.length === 0) {
                     setErrorMsg(result.error || "Processing failed. See the geometry report below.");
                     setStatus(AppStatus.ERROR);
                 } else {
-                    setProfileConfig({ path: selectedPath, contours: selectedContours, data: result.points });
+                    setProfileConfig({ path: selectedPath, contours: selectedContours, closed: closedContours, data: result.points });
                     setStatus(AppStatus.COMPLETE);
                 }
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,6 +194,8 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
         setSelectedPath('');
         setSelectedContours([]);
         setSelectedPlannedContours([]);
+        setClosedContours(false);
+        setClosedPlannedContours(false);
         setProfileConfig(initialConfig);
         setLocalSectionConfig({ interval: 5, width: 10, pathWidth: 1, sections: [] });
         setCrossSections([]);
@@ -209,6 +235,8 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
             selectedPath,
             selectedContours,
             selectedPlannedContours,
+            closedContours,
+            closedPlannedContours,
             profileData: profileConfig.data,
             localSectionConfig,
             crossSections,
@@ -233,7 +261,9 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
             setSelectedPath(project.selectedPath);
             setSelectedContours(project.selectedContours);
             setSelectedPlannedContours(project.selectedPlannedContours);
-            setProfileConfig({ path: project.selectedPath, contours: project.selectedContours, data: project.profileData });
+            setClosedContours(!!project.closedContours);
+            setClosedPlannedContours(!!project.closedPlannedContours);
+            setProfileConfig({ path: project.selectedPath, contours: project.selectedContours, closed: !!project.closedContours, data: project.profileData });
             setLocalSectionConfig(project.localSectionConfig);
             setCrossSections(project.crossSections);
             setRawDxfContent(project.dxfString);
@@ -271,6 +301,9 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
     };
 
     const hasProfile = profileConfig.data.length > 0;
+    // The long section is drawn on demand; say so when the setup has moved on since
+    const profileStale = hasProfile && (profileConfig.path !== selectedPath || !sameLayers(profileConfig.contours, selectedContours) || profileConfig.closed !== closedContours);
+    const canDraw = !!dxfData && !!selectedPath && selectedContours.length > 0;
 
     return (
         <ToolCard title="Path Sections" beta={beta} aside={<Hint>DXF path + contours → long &amp; cross sections</Hint>}>
@@ -279,11 +312,18 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
                 {/* 1. Setup */}
                 <SetupPanel
                     status={status}
+                    profileStale={profileStale}
                     fileName={fileName}
                     layers={layers}
                     selectedPath={selectedPath}
                     selectedContours={selectedContours}
                     selectedPlannedContours={selectedPlannedContours}
+                    closedContours={closedContours}
+                    closedPlannedContours={closedPlannedContours}
+                    contourInfo={contourInfo}
+                    plannedInfo={plannedInfo}
+                    onClosedContoursChange={setClosedContours}
+                    onClosedPlannedContoursChange={setClosedPlannedContours}
                     onFileUpload={handleFileUpload}
                     onPathChange={setSelectedPath}
                     onContourChange={handleContourChange}
@@ -319,7 +359,15 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
                                         {layers.length === 0 ? 'Upload a DXF — step 1' : 'Pick the path and its contours, then draw'}
                                     </EmptyState>
                                 ) : status === AppStatus.COMPLETE || hasProfile ? (
-                                    <LongSection data={profileConfig.data} onError={(m) => notify(m, true)} />
+                                    <>
+                                        {profileStale && (
+                                            <div className="flex flex-wrap items-center justify-between gap-2 border-4 border-black bg-yellow-200 px-3 py-2 text-sm font-bold text-black shadow-[4px_4px_0px_#000]">
+                                                <span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 shrink-0" /> The setup changed since this was drawn.</span>
+                                                <Btn size="sm" variant="plain" onClick={handleGenerate} disabled={!canDraw}><RefreshCw /> Redraw</Btn>
+                                            </div>
+                                        )}
+                                        <LongSection data={profileConfig.data} onError={(m) => notify(m, true)} />
+                                    </>
                                 ) : null}
                             </>
                         ) : activeTab === 'LOCAL' ? (
@@ -328,7 +376,7 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
                                 pathLayer={selectedPath}
                                 contourLayers={selectedContours}
                                 plannedContourLayers={selectedPlannedContours}
-                                entities={dxfData?.entities || []}
+                                entities={entities}
                                 config={localSectionConfig}
                                 onConfigChange={setLocalSectionConfig}
                             />
@@ -338,7 +386,7 @@ const PathSections: React.FC<{ beta?: boolean }> = ({ beta }) => {
                                 <FreeSection
                                     pathLayer={selectedPath}
                                     contourLayers={selectedContours}
-                                    entities={dxfData.entities}
+                                    entities={entities}
                                     sections={crossSections}
                                     onSectionsChange={setCrossSections}
                                 />
