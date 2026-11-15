@@ -89,6 +89,9 @@ jobs:
           mv main/dist site
           cp site/index.html site/404.html
           if [ -d stage/dist ]; then mv stage/dist site/stage; fi
+          # Only the root 404.html (the main build) catches unknown paths, so give
+          # stage-only routes their own copy of the stage index to deep-link into.
+          if [ -d site/stage ]; then mkdir -p site/stage/bg && cp site/stage/index.html site/stage/bg/index.html; fi
 
       - uses: actions/upload-pages-artifact@v3
         with:
