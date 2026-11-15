@@ -290,13 +290,15 @@ export default function SlopeCalculator() {
     <div className="min-h-screen bg-lime-100 relative overflow-hidden">
       <ContourBackground />
       
-      {/* Mobile Menu Button */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
+      {/* Mobile Menu Button: part of the page header, so it scrolls away instead of covering the content */}
+      <div className="md:hidden absolute top-4 left-4 z-30">
         <Button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          onClick={() => setMobileMenuOpen(true)}
+          aria-label="Open tools menu"
+          aria-expanded={mobileMenuOpen}
           className="bg-lime-500 hover:bg-lime-600 text-black border-4 border-black shadow-[4px_4px_0px_#000] p-3"
         >
-          {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          <Menu className="w-6 h-6" />
         </Button>
       </div>
 
@@ -315,12 +317,22 @@ export default function SlopeCalculator() {
               animate={{ x: 0 }}
               exit={{ x: -300 }}
               transition={{type: "tween", duration: 0.2}}
-              className="bg-lime-200 w-80 h-full p-6 border-r-4 border-black shadow-[8px_0px_0px_#000]"
+              className="bg-lime-200 w-80 max-w-[85vw] h-full overflow-y-auto p-6 border-r-4 border-black shadow-[8px_0px_0px_#000]"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-xl font-black text-lime-900 mb-6 uppercase mt-16">
-                Tools
-              </h2>
+              {/* The close button lives in the drawer, so it is there however far the page was scrolled */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-black text-lime-900 uppercase">
+                  Tools
+                </h2>
+                <Button
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Close tools menu"
+                  className="bg-lime-500 hover:bg-lime-600 text-black border-4 border-black shadow-[4px_4px_0px_#000] p-3"
+                >
+                  <X className="w-6 h-6" />
+                </Button>
+              </div>
               <div className="space-y-4">
                 {TOOLS.map((tool) => (
                   <button
