@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
-import TopographyBackground from "../components/TopographyBackground";
+import ContourBackground from "../components/ContourBackground";
 import ResultCard from "../components/ResultCard";
 import StairsCalculator from "../components/StairsCalculator";
 import { BetaTag } from "../components/BetaTag";
@@ -287,7 +287,7 @@ export default function SlopeCalculator() {
 
   return (
     <div className="min-h-screen bg-lime-100 relative overflow-hidden">
-      <TopographyBackground />
+      <ContourBackground />
       
       {/* Mobile Menu Button */}
       <div className="md:hidden fixed top-4 left-4 z-50">
